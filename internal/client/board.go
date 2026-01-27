@@ -119,23 +119,50 @@ func ImportDiagram(whiteboardID string, source string, opts ImportDiagramOptions
 		styleType = 1
 	}
 
-	// Build request body
+	// Map diagram type to API value (integer)
+	// Options: [0,1,2,3,4,5,6,7,8,101,102,201]
+	// Based on lark-cli behavior: auto=0, mindmap=1, sequence=2, activity=3, class=4, er=5, flowchart=6, usecase=7, component=8
+	var diagramType int
+	switch strings.ToLower(opts.DiagramType) {
+	case "mindmap":
+		diagramType = 1
+	case "sequence":
+		diagramType = 2
+	case "activity":
+		diagramType = 3
+	case "class":
+		diagramType = 4
+	case "er":
+		diagramType = 5
+	case "flowchart":
+		diagramType = 6
+	case "usecase":
+		diagramType = 7
+	case "component":
+		diagramType = 8
+	default:
+		diagramType = 0 // auto
+	}
+
+	// Build request body - use field names that match lark-cli
 	reqBody := map[string]interface{}{
-		"diagram_content": content,
-		"diagram_syntax":  syntaxType,
-		"diagram_style":   styleType,
+		"plant_uml_code": content,
+		"syntax_type":    syntaxType,
+		"style_type":     styleType,
+		"diagram_type":   diagramType,
 	}
 
-	bodyBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("序列化请求失败: %w", err)
-	}
+	// 正确的 API 路径是 /nodes/plantuml
+	apiPath := fmt.Sprintf("/open-apis/board/v1/whiteboards/%s/nodes/plantuml", whiteboardID)
 
-	apiPath := fmt.Sprintf("/open-apis/board/v1/whiteboards/%s/diagrams/import", whiteboardID)
-
-	resp, err := client.Post(Context(), apiPath, bodyBytes, larkcore.AccessTokenTypeTenant)
+	resp, err := client.Post(Context(), apiPath, reqBody, larkcore.AccessTokenTypeTenant)
 	if err != nil {
 		return nil, fmt.Errorf("导入图表失败: %w", err)
+	}
+
+	// 检查 HTTP 状态码
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("导入图表失败: HTTP %d, body: %s", resp.StatusCode, string(resp.RawBody))
 	}
 
 	// Parse response
@@ -144,12 +171,8 @@ func ImportDiagram(whiteboardID string, source string, opts ImportDiagramOptions
 		Msg  string `json:"msg"`
 		Data struct {
 			TicketID string `json:"ticket_id"`
+			NodeID   string `json:"node_id"`
 		} `json:"data"`
-	}
-
-	// 检查 HTTP 状态码
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("导入图表失败: HTTP %d, body: %s", resp.StatusCode, string(resp.RawBody))
 	}
 
 	if err := json.Unmarshal(resp.RawBody, &apiResp); err != nil {
@@ -160,8 +183,13 @@ func ImportDiagram(whiteboardID string, source string, opts ImportDiagramOptions
 		return nil, fmt.Errorf("导入图表失败: code=%d, msg=%s", apiResp.Code, apiResp.Msg)
 	}
 
+	nodeID := apiResp.Data.NodeID
+	if nodeID == "" {
+		nodeID = apiResp.Data.TicketID
+	}
+
 	return &ImportDiagramResult{
-		TicketID: apiResp.Data.TicketID,
+		TicketID: nodeID,
 	}, nil
 }
 

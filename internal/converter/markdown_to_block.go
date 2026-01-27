@@ -20,6 +20,9 @@ import (
 // 最大递归深度常量（在 block_to_markdown.go 中定义）
 // const maxRecursionDepth = 100
 
+// 飞书 API 限制单个表格最多 9 行（包括表头）
+const maxTableRows = 9
+
 // MarkdownToBlock converts Markdown to Feishu blocks
 type MarkdownToBlock struct {
 	source   []byte
@@ -34,6 +37,105 @@ func NewMarkdownToBlock(source []byte, options ConvertOptions, basePath string) 
 		options:  options,
 		basePath: basePath,
 	}
+}
+
+// ConvertResult contains converted blocks and table data
+type ConvertResult struct {
+	Blocks     []*larkdocx.Block
+	TableDatas []*TableData // Table data in order of appearance, used for filling content
+}
+
+// ConvertWithTableData converts Markdown to Feishu blocks and returns table data for content filling
+func (c *MarkdownToBlock) ConvertWithTableData() (*ConvertResult, error) {
+	md := goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithParserOptions(
+			parser.WithAutoHeadingID(),
+		),
+	)
+
+	reader := text.NewReader(c.source)
+	doc := md.Parser().Parse(reader)
+
+	result := &ConvertResult{}
+	err := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+
+		switch node := n.(type) {
+		case *ast.Heading:
+			block, err := c.convertHeading(node)
+			if err != nil {
+				return ast.WalkStop, err
+			}
+			if block != nil {
+				result.Blocks = append(result.Blocks, block)
+			}
+			return ast.WalkSkipChildren, nil
+
+		case *ast.Paragraph:
+			block, err := c.convertParagraph(node)
+			if err != nil {
+				return ast.WalkStop, err
+			}
+			if block != nil {
+				result.Blocks = append(result.Blocks, block)
+			}
+			return ast.WalkSkipChildren, nil
+
+		case *ast.FencedCodeBlock:
+			block, err := c.convertCodeBlock(node)
+			if err != nil {
+				return ast.WalkStop, err
+			}
+			if block != nil {
+				result.Blocks = append(result.Blocks, block)
+			}
+			return ast.WalkSkipChildren, nil
+
+		case *ast.List:
+			listBlocks, err := c.convertList(node)
+			if err != nil {
+				return ast.WalkStop, err
+			}
+			result.Blocks = append(result.Blocks, listBlocks...)
+			return ast.WalkSkipChildren, nil
+
+		case *ast.Blockquote:
+			block, err := c.convertBlockquote(node)
+			if err != nil {
+				return ast.WalkStop, err
+			}
+			if block != nil {
+				result.Blocks = append(result.Blocks, block)
+			}
+			return ast.WalkSkipChildren, nil
+
+		case *east.Table:
+			// 使用支持大表格拆分的方法
+			tableResults := c.convertTableWithDataMultiple(node)
+			for _, tableResult := range tableResults {
+				if tableResult != nil {
+					result.Blocks = append(result.Blocks, tableResult.Block)
+					result.TableDatas = append(result.TableDatas, tableResult.TableData)
+				}
+			}
+			return ast.WalkSkipChildren, nil
+
+		case *ast.ThematicBreak:
+			result.Blocks = append(result.Blocks, c.createDividerBlock())
+			return ast.WalkContinue, nil
+		}
+
+		return ast.WalkContinue, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 // Convert converts Markdown to Feishu blocks
@@ -563,71 +665,160 @@ func (c *MarkdownToBlock) createDividerBlock() *larkdocx.Block {
 	}
 }
 
+// TableData stores table information for later content filling
+type TableData struct {
+	Rows         int
+	Cols         int
+	CellContents []string
+	HasHeader    bool
+}
+
+// ConvertTableResult contains both the block and the table data for content filling
+type ConvertTableResult struct {
+	Block     *larkdocx.Block
+	TableData *TableData
+}
+
 func (c *MarkdownToBlock) convertTable(node *east.Table) (*larkdocx.Block, error) {
-	// Count rows and columns
-	var rows, cols int
-	var cellContents []string
+	result := c.convertTableWithData(node)
+	if result == nil {
+		return nil, nil
+	}
+	return result.Block, nil
+}
+
+func (c *MarkdownToBlock) convertTableWithData(node *east.Table) *ConvertTableResult {
+	results := c.convertTableWithDataMultiple(node)
+	if len(results) == 0 {
+		return nil
+	}
+	return results[0]
+}
+
+// convertTableWithDataMultiple 将大表格拆分成多个小表格（每个最多 9 行）
+func (c *MarkdownToBlock) convertTableWithDataMultiple(node *east.Table) []*ConvertTableResult {
+	// Count rows and columns, collect all cell contents
+	var cols int
+	var headerContents []string
+	var dataRows [][]string // 每行的单元格内容
+	hasHeader := false
+
 	for row := node.FirstChild(); row != nil; row = row.NextSibling() {
 		if header, ok := row.(*east.TableHeader); ok {
 			cols = row.ChildCount()
-			rows++
+			hasHeader = true
 			for cell := header.FirstChild(); cell != nil; cell = cell.NextSibling() {
 				if tc, ok := cell.(*east.TableCell); ok {
-					cellContents = append(cellContents, c.getNodeText(tc))
+					headerContents = append(headerContents, c.getNodeText(tc))
 				}
 			}
 		} else if tr, ok := row.(*east.TableRow); ok {
 			if cols == 0 {
 				cols = row.ChildCount()
 			}
-			rows++
+			var rowContents []string
 			for cell := tr.FirstChild(); cell != nil; cell = cell.NextSibling() {
 				if tc, ok := cell.(*east.TableCell); ok {
-					cellContents = append(cellContents, c.getNodeText(tc))
+					rowContents = append(rowContents, c.getNodeText(tc))
 				}
 			}
+			dataRows = append(dataRows, rowContents)
 		}
 	}
 
-	if rows == 0 || cols == 0 {
-		return nil, nil
+	totalRows := len(dataRows)
+	if hasHeader {
+		totalRows++
+	}
+	if totalRows == 0 || cols == 0 {
+		return nil
 	}
 
-	// 飞书 API 对表格创建的限制：
-	// 1. 通过 CreateBlock API 批量创建时，表格 cells 必须为空
-	// 2. 表格内容无法在创建时一次性填充
-	// 3. 将表格内容转换为带格式的文本，保留信息
-	var textContent strings.Builder
-	textContent.WriteString(fmt.Sprintf("┌ 表格 (%d×%d) ┐\n", rows, cols))
-	for i := 0; i < rows; i++ {
-		for j := 0; j < cols; j++ {
-			idx := i*cols + j
-			if idx < len(cellContents) {
-				content := cellContents[idx]
-				if j > 0 {
-					textContent.WriteString(" | ")
-				}
-				textContent.WriteString(content)
-			}
+	// 如果表格不超过限制，直接返回单个表格
+	if totalRows <= maxTableRows {
+		var cellContents []string
+		if hasHeader {
+			cellContents = append(cellContents, headerContents...)
 		}
-		textContent.WriteString("\n")
-	}
-	textContent.WriteString("└────────────┘")
+		for _, row := range dataRows {
+			cellContents = append(cellContents, row...)
+		}
 
-	placeholder := textContent.String()
-	blockType := int(BlockTypeText)
-	return &larkdocx.Block{
-		BlockType: &blockType,
-		Text: &larkdocx.Text{
-			Elements: []*larkdocx.TextElement{
-				{
-					TextRun: &larkdocx.TextRun{
-						Content: &placeholder,
-					},
+		blockType := int(BlockTypeTable)
+		headerRow := hasHeader
+		rows := totalRows
+		block := &larkdocx.Block{
+			BlockType: &blockType,
+			Table: &larkdocx.Table{
+				Property: &larkdocx.TableProperty{
+					RowSize:    &rows,
+					ColumnSize: &cols,
+					HeaderRow:  &headerRow,
 				},
 			},
-		},
-	}, nil
+		}
+
+		return []*ConvertTableResult{{
+			Block: block,
+			TableData: &TableData{
+				Rows:         rows,
+				Cols:         cols,
+				CellContents: cellContents,
+				HasHeader:    hasHeader,
+			},
+		}}
+	}
+
+	// 需要拆分表格
+	// 每个子表格最多有 maxTableRows 行，第一个表格包含表头+数据，后续表格复制表头
+	var results []*ConvertTableResult
+	maxDataRowsPerTable := maxTableRows
+	if hasHeader {
+		maxDataRowsPerTable = maxTableRows - 1 // 留一行给表头
+	}
+
+	for i := 0; i < len(dataRows); i += maxDataRowsPerTable {
+		end := i + maxDataRowsPerTable
+		if end > len(dataRows) {
+			end = len(dataRows)
+		}
+		chunkDataRows := dataRows[i:end]
+
+		var cellContents []string
+		rows := len(chunkDataRows)
+		if hasHeader {
+			cellContents = append(cellContents, headerContents...)
+			rows++
+		}
+		for _, row := range chunkDataRows {
+			cellContents = append(cellContents, row...)
+		}
+
+		blockType := int(BlockTypeTable)
+		headerRow := hasHeader
+		block := &larkdocx.Block{
+			BlockType: &blockType,
+			Table: &larkdocx.Table{
+				Property: &larkdocx.TableProperty{
+					RowSize:    &rows,
+					ColumnSize: &cols,
+					HeaderRow:  &headerRow,
+				},
+			},
+		}
+
+		results = append(results, &ConvertTableResult{
+			Block: block,
+			TableData: &TableData{
+				Rows:         rows,
+				Cols:         cols,
+				CellContents: cellContents,
+				HasHeader:    hasHeader,
+			},
+		})
+	}
+
+	return results
 }
 
 func (c *MarkdownToBlock) extractTextElements(node ast.Node) []*larkdocx.TextElement {

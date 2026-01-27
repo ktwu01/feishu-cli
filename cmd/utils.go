@@ -74,6 +74,13 @@ func validateOutputPath(outputPath string, allowedDir string) error {
 	return nil
 }
 
+// unescapeSheetRange 处理 shell 转义的范围字符串
+// 在某些 shell（如 zsh）中，! 字符会被自动转义为 \!
+// 此函数将 \! 转换回 !
+func unescapeSheetRange(rangeStr string) string {
+	return strings.ReplaceAll(rangeStr, "\\!", "!")
+}
+
 // safeOutputPath 生成安全的输出路径
 // 移除不安全的字符，防止路径遍历
 func safeOutputPath(baseName string, ext string) string {

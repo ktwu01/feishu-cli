@@ -3,6 +3,8 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
 
 	larkdocx "github.com/larksuite/oapi-sdk-go/v3/service/docx/v1"
 )
@@ -348,4 +350,122 @@ func GetBlockChildren(documentID string, blockID string) ([]*larkdocx.Block, err
 	}
 
 	return resp.Data.Items, nil
+}
+
+// AddBoardResult contains the result of adding a board to document
+type AddBoardResult struct {
+	BlockID      string `json:"block_id"`
+	WhiteboardID string `json:"whiteboard_id"`
+}
+
+// AddBoard adds a board block to document and returns the whiteboard ID
+func AddBoard(documentID string, parentID string, index int) (*AddBoardResult, error) {
+	if parentID == "" {
+		parentID = documentID
+	}
+
+	// 构建画板块 (block_type = 43)
+	blockType := 43 // Board
+	boardBlock := &larkdocx.Block{
+		BlockType: &blockType,
+		Board:     &larkdocx.Board{},
+	}
+
+	// 创建画板块
+	createdBlocks, err := CreateBlock(documentID, parentID, []*larkdocx.Block{boardBlock}, index)
+	if err != nil {
+		return nil, fmt.Errorf("创建画板块失败: %w", err)
+	}
+
+	if len(createdBlocks) == 0 {
+		return nil, fmt.Errorf("创建画板块失败：未返回块信息")
+	}
+
+	result := &AddBoardResult{}
+	if createdBlocks[0].BlockId != nil {
+		result.BlockID = *createdBlocks[0].BlockId
+	}
+	if createdBlocks[0].Board != nil && createdBlocks[0].Board.Token != nil {
+		result.WhiteboardID = *createdBlocks[0].Board.Token
+	}
+
+	return result, nil
+}
+
+// FillTableCells fills table cells with content by creating text blocks inside each cell
+// cellIDs: cell block IDs from the created table
+// contents: cell content strings (in row-major order)
+func FillTableCells(documentID string, cellIDs []string, contents []string) error {
+	if len(cellIDs) == 0 || len(contents) == 0 {
+		return nil
+	}
+
+	// Table cells are container blocks, we need to create text blocks inside them
+	for i, cellID := range cellIDs {
+		if i >= len(contents) {
+			break
+		}
+		content := contents[i]
+		if content == "" {
+			continue
+		}
+
+		// Create a text block inside the cell
+		blockType := 2 // Text block
+		textBlock := &larkdocx.Block{
+			BlockType: &blockType,
+			Text: &larkdocx.Text{
+				Elements: []*larkdocx.TextElement{
+					{
+						TextRun: &larkdocx.TextRun{
+							Content: &content,
+						},
+					},
+				},
+			},
+		}
+
+		// Create the text block as a child of the cell with retry for rate limiting
+		var err error
+		maxRetries := 3
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			_, err = CreateBlock(documentID, cellID, []*larkdocx.Block{textBlock}, 0)
+			if err == nil {
+				break
+			}
+			// Check if it's a rate limiting error (429)
+			if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "rate") {
+				// Exponential backoff: 1s, 2s, 4s
+				sleepTime := time.Duration(1<<attempt) * time.Second
+				time.Sleep(sleepTime)
+				continue
+			}
+			// For other errors, don't retry
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("填充单元格 %d 失败: %w", i, err)
+		}
+
+		// Small delay between cells to avoid rate limiting
+		if i%10 == 9 {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	return nil
+}
+
+// GetTableCellIDs retrieves cell block IDs from a table block
+func GetTableCellIDs(documentID string, tableBlockID string) ([]string, error) {
+	block, err := GetBlock(documentID, tableBlockID)
+	if err != nil {
+		return nil, err
+	}
+
+	if block.Table == nil || len(block.Table.Cells) == 0 {
+		return nil, fmt.Errorf("块不是表格或没有单元格")
+	}
+
+	return block.Table.Cells, nil
 }

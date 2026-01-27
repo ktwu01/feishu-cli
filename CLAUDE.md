@@ -2,7 +2,41 @@
 
 ## 项目概述
 
-`feishu-cli` 是一个功能完整的飞书开放平台命令行工具，支持文档操作、Markdown 双向转换、消息发送、权限管理、知识库操作、文件管理、评论管理等功能。
+`feishu-cli` 是一个功能完整的飞书开放平台命令行工具，**核心功能是 Markdown ↔ 飞书文档双向转换**，支持文档操作、消息发送、权限管理、知识库操作、文件管理、评论管理等功能。
+
+## 核心功能：Markdown 转换
+
+### Mermaid 图表转画板
+
+**推荐用户使用 Mermaid 画图**，导入时会自动转换为飞书画板：
+
+```bash
+feishu-cli doc import doc.md --title "技术文档" --verbose
+```
+
+支持的 Mermaid 类型（全部已验证 2026-01-27）：
+- ✅ flowchart（流程图，支持 subgraph）
+- ✅ sequenceDiagram（时序图）
+- ✅ classDiagram（类图）
+- ✅ stateDiagram-v2（状态图）
+- ✅ erDiagram（ER 图）
+- ✅ gantt（甘特图）
+- ✅ pie（饼图）
+
+**技术实现**：使用飞书画板 API `/nodes/plantuml` 端点，`syntax_type=2` 表示 Mermaid 语法。
+
+### 大表格自动拆分
+
+飞书 API 限制单个表格最多 9 行。超过 9 行的表格会**自动拆分**为多个表格，每个都保留表头：
+
+- 10 行表格 → 拆分为 2 个表格（9行 + 2行）
+- 20 行表格 → 拆分为 3 个表格（9行 + 9行 + 4行）
+
+### 已验证的大规模导入
+
+- **10,000+ 行 Markdown** ✓
+- **77 个 Mermaid 图表** → 全部成功转换为飞书画板 ✓
+- **236 个表格**（含大表格拆分）→ 全部成功 ✓
 
 ## 技术栈
 
@@ -105,7 +139,8 @@ feishu-cli/
 │   │   ├── task.go               # 任务 API
 │   │   ├── search.go             # 搜索 API
 │   │   ├── user.go               # 用户 API
-│   │   └── board.go              # 画板 API
+│   │   ├── board.go              # 画板 API
+│   │   └── sheets.go             # 电子表格 API
 │   ├── converter/                # Markdown 转换器
 │   │   ├── block_to_markdown.go  # Block → Markdown
 │   │   ├── markdown_to_block.go  # Markdown → Block
@@ -224,6 +259,28 @@ go vet ./...
 # === 搜索操作（需要 User Access Token） ===
 ./feishu-cli search messages "关键词" --user-access-token <token>
 ./feishu-cli search apps "应用名"
+
+# === 电子表格操作 ===
+./feishu-cli sheet create --title "新表格"           # 创建电子表格
+./feishu-cli sheet get <spreadsheet_token>           # 获取表格信息
+./feishu-cli sheet list-sheets <spreadsheet_token>   # 列出工作表
+./feishu-cli sheet read <token> "Sheet1!A1:C10"      # 读取单元格
+./feishu-cli sheet write <token> "Sheet1!A1:B2" --data '[["姓名","年龄"],["张三",25]]'  # 写入数据
+./feishu-cli sheet append <token> "Sheet1!A:B" --data '[["新行","数据"]]'  # 追加数据
+./feishu-cli sheet add-sheet <token> --title "新工作表"   # 添加工作表
+./feishu-cli sheet delete-sheet <token> <sheet_id>   # 删除工作表
+./feishu-cli sheet add-rows <token> <sheet_id> -n 5  # 添加 5 行
+./feishu-cli sheet add-cols <token> <sheet_id> -n 3  # 添加 3 列
+./feishu-cli sheet delete-rows <token> <sheet_id> --start 0 --end 5  # 删除行
+./feishu-cli sheet delete-cols <token> <sheet_id> --start 0 --end 3  # 删除列
+./feishu-cli sheet merge <token> "Sheet1!A1:C3"      # 合并单元格
+./feishu-cli sheet unmerge <token> "Sheet1!A1:C3"    # 取消合并
+./feishu-cli sheet find <token> <sheet_id> "关键词"   # 查找内容
+./feishu-cli sheet replace <token> <sheet_id> "旧值" "新值"  # 替换内容
+./feishu-cli sheet style <token> "Sheet1!A1:C3" --bold --bg-color "#FF0000"  # 设置样式
+./feishu-cli sheet filter create <token> <sheet_id> "A1:C10"  # 创建筛选
+./feishu-cli sheet protect <token> <sheet_id> --dimension ROWS --start 0 --end 5  # 创建保护
+./feishu-cli sheet image add <token> <sheet_id> --token img_xxx --range "A1:A1"  # 添加浮动图片
 ```
 
 ## 配置方式
@@ -284,6 +341,9 @@ app_secret: "xxx"
 - Callout 块只需设置 BackgroundColor（1-7 对应不同颜色），不能同时设置 EmojiId
 - 画板 API 使用通用 HTTP 请求方式（client.Get/Post），非专用 SDK 方法
 - 用户信息 API 需要 `contact:user.base:readonly` 权限
+- 电子表格 V3 API 用于表格管理（创建/获取/工作表），V2 API 用于单元格读写
+- 电子表格范围格式：`SheetID!A1:C10`，支持整列 `A:C` 和整行 `1:3`
+- 电子表格单元格数据使用 JSON 二维数组：`[["A1","B1"],["A2","B2"]]`
 
 ## Claude Code 技能
 
@@ -358,6 +418,7 @@ export FEISHU_APP_SECRET=<your_app_secret>
 | 会话历史 | `im:message:readonly` | 获取历史消息 |
 | 用户信息 | `contact:user.base:readonly` | 获取用户信息 |
 | 画板操作 | `board:board` | 画板读写 |
+| 电子表格 | `sheets:spreadsheet` | 电子表格读写 |
 | 日历 | `calendar:calendar:readonly`, `calendar:calendar` | 日历管理（需单独申请） |
 | 任务 | `task:task:read`, `task:task:write` | 任务管理（需单独申请） |
 | 搜索 | 需要 User Access Token | 用户授权 |
@@ -370,6 +431,19 @@ export FEISHU_APP_SECRET=<your_app_secret>
 | file quota | `file quota` 命令 SDK 未实现 | 不支持 |
 | 删除确认 | `file delete` 需要交互输入 y/N 确认 | 设计如此 |
 | wiki spaces | 列出知识空间可能返回空（取决于应用权限范围） | 权限相关 |
+
+## API 限制与处理
+
+| 限制 | 说明 | 处理方式 |
+|------|------|----------|
+| 表格行数 | 单个表格最多 9 行 | 自动拆分为多个表格 |
+| 批量创建块 | 每次最多 50 个块 | 自动分批处理 |
+| API 频率限制 | 请求过快会返回 429 | 自动重试 + 延迟 |
+| Mermaid 间隔 | 画板创建需要间隔 | 每个图表间隔 2 秒 |
+| sheet filter create | V3 API 需要完整的 col+condition 参数，仅 range 不足 | API 限制 |
+| sheet protect | V2 API 返回 "invalid operation"，可能是权限或 API 格式问题 | 待修复 |
+| sheet formatter | 简单小数格式如 "0.00" 无效，需使用 "#,##0.00"（带千位分隔符） | API 限制 |
+| shell 转义 | zsh 中 `!` 会被自动转义为 `\!`，已在代码中处理 | 已处理 |
 
 ## 功能测试验证
 
@@ -392,7 +466,33 @@ export FEISHU_APP_SECRET=<your_app_secret>
 ✅ msg search-chats
 ✅ msg history（需要 im:message:readonly 权限）
 ✅ task create/complete/delete
+✅ sheet create/get/list-sheets（电子表格基础操作）
+✅ sheet read/write/append（单元格读写，支持布尔值自动转换）
+✅ sheet add-sheet/delete-sheet/copy-sheet（工作表管理）
+✅ sheet add-rows/add-cols/delete-rows/delete-cols/insert-rows（行列操作）
+✅ sheet merge/unmerge（合并单元格）
+✅ sheet style（样式设置，hAlign/vAlign 使用整数值）
+✅ sheet meta（元信息获取）
+✅ sheet image list（浮动图片列表）
+✅ sheet find/replace（查找替换，范围需要 sheetId! 前缀）
 
-⚠️ board import（API 返回 404，可能需要特殊权限）
+✅ Mermaid 图表导入（20个图表类型全部验证通过）
+
+⚠️ sheet filter create（需要完整的 col+condition 参数）
+⚠️ sheet protect（V2 API 返回 "invalid operation"）
+⚠️ board import CLI（命令行单独导入，API 返回 404）
 ⚠️ board create-notes（API 格式问题）
 ```
+
+### Mermaid 导入修复记录（2026-01-27）
+
+**问题**：Mermaid 图表转画板显示空白
+
+**原因**：
+1. API 路径错误：使用 `/nodes` 而非 `/nodes/plantuml`
+2. `diagram_type` 参数类型错误：使用字符串而非整数
+
+**修复**（`internal/client/board.go`）：
+- API 路径：`/open-apis/board/v1/whiteboards/{id}/nodes/plantuml`
+- `diagram_type` 映射：0=auto, 1=mindmap, 2=sequence, 3=activity, 4=class, 5=er, 6=flowchart, 7=usecase, 8=component
+- `syntax_type`：1=PlantUML, 2=Mermaid

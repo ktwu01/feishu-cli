@@ -1,6 +1,56 @@
 # feishu-cli
 
-飞书开放平台命令行工具，支持文档、知识库、消息、日历、任务等全功能操作，并提供 Markdown 双向转换。
+飞书开放平台命令行工具，**核心功能是 Markdown ↔ 飞书文档双向转换**，支持文档、知识库、消息、日历、任务等全功能操作。
+
+## 核心特性：Markdown 与飞书文档互转
+
+**feishu-cli 最强大的功能是 Markdown 和飞书文档的双向转换**，特别适合：
+
+- **技术文档发布**：将本地 Markdown 文档一键上传到飞书
+- **Mermaid 图表渲染**：Mermaid 代码块自动转换为飞书画板（推荐使用 Mermaid 画图）
+- **表格自动处理**：超大表格自动拆分（飞书限制单表格最多 9 行）
+- **文档备份**：将飞书文档导出为标准 Markdown
+
+### 快速体验
+
+```bash
+# 从 Markdown 创建飞书文档（支持 mermaid 图表、表格）
+feishu-cli doc import report.md --title "技术分析报告" --verbose
+
+# 导出飞书文档为 Markdown
+feishu-cli doc export <document_id> -o doc.md --download-images
+```
+
+### Mermaid 图表支持
+
+**推荐在文档中使用 Mermaid 画图**，导入时会自动转换为飞书画板：
+
+````markdown
+```mermaid
+flowchart TD
+    A[用户请求] --> B{验证}
+    B -->|通过| C[处理请求]
+    B -->|失败| D[返回错误]
+    C --> E[返回结果]
+```
+````
+
+支持的 Mermaid 图表类型（全部已验证）：
+- ✅ 流程图 (flowchart) - 支持 subgraph
+- ✅ 时序图 (sequenceDiagram)
+- ✅ 类图 (classDiagram)
+- ✅ 状态图 (stateDiagram-v2)
+- ✅ ER 图 (erDiagram)
+- ✅ 甘特图 (gantt)
+- ✅ 饼图 (pie)
+
+### 大规模文档测试
+
+已验证可成功导入的大型文档（2026-01-27）：
+- **10,000+ 行 Markdown**
+- **77 个 Mermaid 图表** → 全部成功转换为飞书画板
+- **236 个表格** → 自动拆分处理，全部成功
+- **20 种图表类型测试** → flowchart/sequenceDiagram/classDiagram/stateDiagram/erDiagram/gantt/pie 全部成功
 
 ## 项目定位
 
@@ -189,21 +239,47 @@ feishu-cli doc add-callout <document_id> "成功内容" --callout-type success
 feishu-cli doc add-board <document_id>
 ```
 
-## Markdown 转换
+## Markdown 转换（核心功能）
+
+### 从 Markdown 导入（推荐使用）
+
+```bash
+# 基本导入
+feishu-cli doc import doc.md --title "新文档"
+
+# 导入到已有文档（追加内容）
+feishu-cli doc import doc.md --document-id <document_id>
+
+# 详细模式（显示进度）
+feishu-cli doc import doc.md --title "技术报告" --verbose
+```
+
+**导入特性：**
+- **Mermaid 图表** → 自动转换为飞书画板
+- **超大表格** → 自动拆分（飞书限制单表最多 9 行）
+- **代码块** → 保留语法高亮
+- **本地图片** → 自动上传（`--upload-images`）
 
 ### 导出为 Markdown
 
 ```bash
+# 基本导出
 feishu-cli doc export <document_id>
+
+# 导出并下载图片
 feishu-cli doc export <document_id> -o doc.md --download-images
 ```
 
-### 从 Markdown 导入
+**导出特性：**
+- 飞书画板 → 生成画板链接
+- 表格、代码块 → 标准 Markdown 格式
+- 图片 → 可选下载到本地
 
-```bash
-feishu-cli doc import doc.md --title "新文档"
-feishu-cli doc import doc.md --document-id <document_id> --upload-images
-```
+### 最佳实践
+
+1. **写文档时使用 Mermaid 画图**（而非截图）
+2. 表格尽量简洁，超过 9 行会被自动拆分
+3. 大文档导入使用 `--verbose` 查看进度
 
 ## 知识库操作
 

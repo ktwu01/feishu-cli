@@ -604,9 +604,25 @@ func TestConvert_Table(t *testing.T) {
 		t.Fatal("blocks 为空")
 	}
 
-	// 表格应该转为文本占位符（由于 API 限制）
-	if blocks[0].BlockType == nil || *blocks[0].BlockType != int(BlockTypeText) {
-		t.Errorf("表格应转为文本块，BlockType = %v", blocks[0].BlockType)
+	// 表格应该转为 Table 块（block_type=31）
+	if blocks[0].BlockType == nil || *blocks[0].BlockType != int(BlockTypeTable) {
+		t.Errorf("表格应转为 Table 块，BlockType = %v, 期望 %d", blocks[0].BlockType, int(BlockTypeTable))
+	}
+
+	// 验证表格属性
+	if blocks[0].Table == nil {
+		t.Fatal("Table 属性为空")
+	}
+	if blocks[0].Table.Property == nil {
+		t.Fatal("Table.Property 为空")
+	}
+	// 3 行（1 表头 + 2 数据行）
+	if blocks[0].Table.Property.RowSize == nil || *blocks[0].Table.Property.RowSize != 3 {
+		t.Errorf("RowSize = %v, 期望 3", blocks[0].Table.Property.RowSize)
+	}
+	// 3 列
+	if blocks[0].Table.Property.ColumnSize == nil || *blocks[0].Table.Property.ColumnSize != 3 {
+		t.Errorf("ColumnSize = %v, 期望 3", blocks[0].Table.Property.ColumnSize)
 	}
 }
 
