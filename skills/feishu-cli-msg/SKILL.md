@@ -149,6 +149,3 @@ feishu-cli msg send \
 - `--receive-id-type`（不是 `--email`）
 - `--receive-id`（接收者 ID）
 
-## 参考
-
-详细消息结构见 `references/message_content.md`

@@ -98,7 +98,7 @@ feishu-cli msg send --receive-id-type email --receive-id user@example.com --text
 feishu-cli doc import README.md --title "项目文档" --upload-images
 ```
 
-**支持的语法**：标题、段落、列表、任务列表、代码块、引用、表格、分割线、图片、链接、粗体/斜体/删除线
+**支持的语法**：标题、段落、列表（支持嵌套）、任务列表、代码块、引用、表格、分割线、图片、链接、粗体/斜体/删除线
 
 ### Mermaid / PlantUML 图表
 
@@ -235,9 +235,18 @@ feishu-cli perm add <doc_id> \
 | `/feishu-cli-export` | 导出文档为 Markdown |
 | `/feishu-cli-read` | 读取飞书文档/知识库 |
 | `/feishu-cli-write` | 写入/更新文档 |
+| `/feishu-cli-create` | 快速创建空白文档 |
+| `/feishu-cli-wiki` | 知识库操作 |
 | `/feishu-cli-sheet` | 电子表格操作 |
 | `/feishu-cli-msg` | 发送飞书消息 |
 | `/feishu-cli-perm` | 权限管理 |
+| `/feishu-cli-file` | 云空间文件管理 |
+| `/feishu-cli-media` | 素材管理（上传/下载） |
+| `/feishu-cli-comment` | 文档评论操作 |
+| `/feishu-cli-calendar` | 日历和日程管理 |
+| `/feishu-cli-task` | 任务管理 |
+| `/feishu-cli-plantuml` | PlantUML 图表生成 |
+| `/feishu-cli-search` | 搜索消息和应用 |
 
 **使用方法**：将 `skills/` 目录复制到项目中，AI 助手即可通过 `/feishu-cli-xxx` 命令操作飞书。
 
@@ -246,8 +255,8 @@ feishu-cli perm add <doc_id> \
 | Markdown | 飞书块类型 | 说明 |
 |----------|-----------|------|
 | `# 标题` | Heading 1-6 | 支持 6 级标题 |
-| `- 列表` | Bullet | 无序列表 |
-| `1. 列表` | Ordered | 有序列表 |
+| `- 列表` | Bullet | 无序列表（支持嵌套） |
+| `1. 列表` | Ordered | 有序列表（支持嵌套） |
 | `- [ ] 任务` | Todo | 任务列表 |
 | ` ```代码``` ` | Code | 代码块 |
 | ` ```mermaid``` ` | Board | 自动转画板 |
@@ -271,6 +280,9 @@ feishu-cli perm add <doc_id> \
 | 电子表格 | `sheets:spreadsheet` |
 | 用户信息 | `contact:user.base:readonly` |
 | 画板 | `board:board` |
+| 日历 | `calendar:calendar:readonly`, `calendar:calendar` |
+| 任务 | `task:task:read`, `task:task:write` |
+| 搜索 | 需要 User Access Token |
 
 ## 开发
 

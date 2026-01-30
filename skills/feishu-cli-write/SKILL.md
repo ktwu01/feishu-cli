@@ -108,7 +108,7 @@ Bob --> Alice: Hi
 ```
 ````
 
-支持的 Mermaid 图表类型（全部已验证 2026-01-27）：
+支持的 Mermaid 图表类型：
 - ✅ flowchart（流程图，支持 subgraph）
 - ✅ sequenceDiagram（时序图）
 - ✅ classDiagram（类图）

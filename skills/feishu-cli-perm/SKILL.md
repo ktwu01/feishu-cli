@@ -177,6 +177,3 @@ feishu-cli perm add <doc_token> \
   --notification
 ```
 
-## 参考
-
-详细参数枚举见 `references/add_permission.md`

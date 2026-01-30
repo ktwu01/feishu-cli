@@ -193,6 +193,3 @@ amount : decimal
 
 飞书画板 PlantUML 版本较旧，ArchiMate sprite 不完整。建议改用组件图。
 
-## 参考
-
-详细安全子集语法见 `references/plantuml-safe-subset.md`

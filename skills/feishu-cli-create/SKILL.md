@@ -29,7 +29,7 @@ allowed-tools: Bash
    ```
 
 3. **发送通知**
-   使用 `/lark-send-msg` 技能发送消息通知用户
+   使用 `/feishu-cli-msg` 技能发送消息通知用户
 
 4. **返回结果**
    - 文档 ID
