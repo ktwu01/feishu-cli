@@ -49,8 +49,10 @@ feishu-cli media upload ./image.png --parent-type docx_image --parent-node <doc_
 **parent-type 类型**：
 | 值 | 说明 |
 |-----|------|
-| `docx_image` | 文档中的图片 |
-| `docx_file` | 文档中的附件 |
+| `docx_image` | 新版文档图片（推荐，默认值） |
+| `docx_file` | 新版文档文件 |
+| `doc_image` | 旧版文档图片（不推荐，DocX 文档中会失败） |
+| `doc_file` | 旧版文档文件 |
 | `sheet_image` | 表格中的图片 |
 | `comment_image` | 评论中的图片 |
 
@@ -162,3 +164,4 @@ feishu-cli media upload /tmp/img.png --parent-type docx_image --parent-node <new
 2. **临时链接**：通过 API 获取的图片链接有时效性（通常 24 小时）
 3. **批量操作**：建议使用 `doc export --download-images` 批量下载文档图片
 4. **格式转换**：飞书可能对上传的图片进行格式转换和压缩
+5. **默认值变更（v1.4.1）**：`--parent-type` 默认值已从 `doc_image` 改为 `docx_image`，旧值在 DocX 文档中会导致上传失败

@@ -92,7 +92,7 @@ app_secret: "xxx"
 **导入**：`feishu-cli doc import doc.md --title "文档" --verbose`
 **导出**：`feishu-cli doc export <doc_id> -o output.md`
 
-支持的语法：标题、段落、列表（无限深度嵌套）、任务列表、代码块、引用（QuoteContainer）、Callout（6 种类型）、表格、分割线、图片、链接、公式（块级/行内）、粗体/斜体/删除线/下划线/行内代码/高亮
+支持的语法：标题、段落、列表（无限深度嵌套）、任务列表、代码块、引用（QuoteContainer）、Callout（6 种类型）、表格、分割线、图片（占位块，Open API 暂不支持插入实际图片）、链接、公式（块级/行内）、粗体/斜体/删除线/下划线/行内代码/高亮
 
 ### Mermaid / PlantUML 图表转画板
 
@@ -260,6 +260,7 @@ feishu-cli search messages "关键词" --user-access-token <token>
 | Mermaid 复杂度 | 10+ participant + 2+ alt + 30+ 长标签 | 重试后降级为代码块 |
 | sheet filter | 需要完整 col+condition 参数 | API 限制 |
 | sheet protect | V2 API 返回 "invalid operation" | 待修复 |
+| 图片插入 | DocX Open API 不支持通过 API 插入图片 | 创建空 Image 占位块，导入报告显示跳过数 |
 | shell 转义 | zsh 中 `!` 被转义为 `\!` | 已在代码中处理 |
 
 ## Claude Code 技能

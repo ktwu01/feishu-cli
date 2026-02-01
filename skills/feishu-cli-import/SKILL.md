@@ -91,6 +91,7 @@ allowed-tools: Bash, Read
 - **引用块**（支持嵌套引用，自动转换为 QuoteContainer）
 - **Callout 高亮块**（`> [!NOTE]`、`> [!WARNING]` 等 6 种类型）
 - 分割线
+- **图片**（创建占位块，飞书 Open API 暂不支持插入实际图片；内联图片转为链接或文本占位符）
 - **表格**（超过 9 行自动拆分）
 - 粗体、斜体、删除线、行内代码、**下划线**（`<u>文本</u>`）
 - 链接
@@ -199,7 +200,7 @@ $\int_{0}^{\infty} e^{-x^2} dx = \frac{\sqrt{\pi}}{2}$
 # 更新现有文档
 /feishu-import ./updated-spec.md --document-id <document_id>
 
-# 带图片导入
+# 带图片导入（创建占位块，Open API 暂不支持插入实际图片）
 /feishu-import ./blog-post.md --title "博客文章" --upload-images
 ```
 
@@ -227,6 +228,8 @@ $\int_{0}^{\infty} e^{-x^2} dx = \frac{\sqrt{\pi}}{2}$
 | **块级公式** (`$$...$$`) | ✅ 正常 | 创建为 Text 块内 Equation 元素 |
 | **表格** | ✅ 正常 | 超过9行自动拆分 |
 | 链接 | ✅ 正常 | |
+| **图片** | ✅ 占位块 | Open API 不支持插入实际图片，创建空 Image 块，用户可在网页端手动添加 |
+| **内联图片** | ✅ 链接化 | 网络 URL 转可点击链接，本地路径转文本占位符 |
 
 ### 大规模测试结果
 
