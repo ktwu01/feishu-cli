@@ -25,14 +25,14 @@
 
 feishu-cli 是一个功能完整的飞书开放平台命令行工具。它将飞书文档、知识库、电子表格、消息、日历、任务等操作封装为简洁的命令行接口，**核心能力是 Markdown ↔ 飞书文档双向无损转换**。
 
-除了传统的 CLI 用法，feishu-cli 还为 [Claude Code](https://claude.ai/claude-code) 等 AI 编程助手提供了 **18 个开箱即用的技能文件**，让 AI Agent 能够直接创建文档、发送消息、管理权限 — 无需任何额外配置。
+除了传统的 CLI 用法，feishu-cli 还为 [Claude Code](https://claude.ai/claude-code) 等 AI 编程助手提供了 **8 个开箱即用的技能文件**，让 AI Agent 能够直接创建文档、发送消息、管理权限 — 无需任何额外配置。
 
 ### 为什么选择 feishu-cli
 
 - **双向转换零损耗** — 支持 40+ 种块类型，Markdown 导入飞书后再导出，内容完整保留
 - **图表原生渲染** — Mermaid（8 种图表类型）和 PlantUML 自动转换为飞书画板，不是截图，是可编辑的矢量图
 - **大规模文档处理** — 三阶段并发管道架构，实测 10,000+ 行 / 127 个图表 / 170+ 个表格一次导入
-- **AI Agent 原生** — 18 个技能文件覆盖飞书全功能，AI 助手即装即用
+- **AI Agent 原生** — 8 个技能文件覆盖飞书全功能，AI 助手即装即用
 - **一个工具覆盖全平台** — 文档、知识库、表格、消息、日历、任务、权限、画板、评论、搜索
 
 ## 核心能力
@@ -479,27 +479,17 @@ feishu-cli dept children <department_id>
 
 ## AI 技能集成
 
-`skills/` 目录包含 **18 个** 为 [Claude Code](https://claude.ai/claude-code) 设计的技能文件，让 AI Agent 能够直接操作飞书 — 创建文档、发送消息、管理权限，全部通过自然语言驱动。
+`skills/` 目录包含 **8 个** 为 [Claude Code](https://claude.ai/claude-code) 设计的技能文件，让 AI Agent 能够直接操作飞书 — 创建文档、发送消息、管理权限，全部通过自然语言驱动。
 
 | 技能 | 功能 | 触发示例 |
 |------|------|---------|
-| `feishu-cli-import` | 从 Markdown 导入创建文档 | "把这个 md 文件上传到飞书" |
-| `feishu-cli-export` | 导出文档为 Markdown | "把飞书文档导出来" |
 | `feishu-cli-read` | 读取飞书文档 / 知识库 | "读一下这个飞书链接" |
-| `feishu-cli-write` | 写入 / 更新文档 | "帮我更新飞书文档" |
-| `feishu-cli-create` | 快速创建空白文档 | "创建一个新飞书文档" |
-| `feishu-cli-wiki` | 知识库操作 | "查看知识库节点" |
-| `feishu-cli-sheet` | 电子表格操作 | "读取飞书表格数据" |
-| `feishu-cli-msg` | 发送飞书消息 | "发消息给 xxx" |
+| `feishu-cli-write` | 创建 / 写入 / 更新文档 | "创建一个新飞书文档" |
+| `feishu-cli-import` | 从 Markdown 导入创建文档 | "把这个 md 文件上传到飞书" |
+| `feishu-cli-export` | 导出为 Markdown / PDF / Word | "把飞书文档导出来" |
 | `feishu-cli-perm` | 权限管理 | "给文档添加权限" |
-| `feishu-cli-board` | 画板操作 | "导入图表到画板" |
-| `feishu-cli-file` | 云空间文件管理 | "列出飞书文件" |
-| `feishu-cli-media` | 素材管理 | "上传图片到飞书" |
-| `feishu-cli-comment` | 文档评论操作 | "查看文档评论" |
-| `feishu-cli-calendar` | 日历和日程管理 | "创建一个日程" |
-| `feishu-cli-task` | 任务管理 | "创建一个飞书任务" |
-| `feishu-cli-plantuml` | PlantUML 图表生成 | "画一个架构图" |
-| `feishu-cli-search` | 搜索消息和应用 | "搜索飞书消息" |
+| `feishu-cli-msg` | 消息全功能管理 | "发消息给 xxx" |
+| `feishu-cli-toolkit` | 综合工具箱（表格/日历/任务/群聊/画板/文件/评论/知识库/搜索/通讯录） | "读取飞书表格数据" |
 | `feishu-cli-doc-guide` | 飞书文档创建规范 | 其他技能内部引用 |
 
 **使用方法**：将 `skills/` 目录复制到你的 Claude Code 项目中（或放在 `~/.claude/skills/`），AI 助手即可通过自然语言操作飞书。

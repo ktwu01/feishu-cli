@@ -1,6 +1,9 @@
 ---
 name: feishu-cli-write
-description: 向飞书文档写入内容，支持 Mermaid/PlantUML 图表自动转画板。支持添加画板、Callout、批量更新块等高级操作。当用户请求创建、写入、更新飞书文档时使用。推荐使用 Mermaid 画图。
+description: >-
+  向飞书文档写入内容、创建新文档、新建空白文档。支持 Mermaid/PlantUML 图表自动转画板、
+  Callout、批量更新块等高级操作。当用户请求"创建文档"、"新建文档"、"写一份文档"、
+  "写入"、"更新文档"、"编辑文档"、"添加内容"时使用。推荐使用 Mermaid 画图。
 argument-hint: <title|document_id> [content]
 user-invocable: true
 allowed-tools: Bash, Write, Read
@@ -9,6 +12,25 @@ allowed-tools: Bash, Write, Read
 # 飞书文档写入技能
 
 创建或更新飞书云文档，通过 Markdown 作为中间格式。**支持 Mermaid/PlantUML 图表自动转飞书画板**。
+
+## 快速创建空白文档
+
+最简方式创建一个新的飞书云文档：
+
+```bash
+feishu-cli doc create --title "文档标题" --output json
+```
+
+创建后**必须立即**：
+1. 授予 `full_access` 权限：
+   ```bash
+   feishu-cli perm add <document_id> --doc-type docx --member-type email --member-id user@example.com --perm full_access --notification
+   ```
+2. 转移文档所有权：
+   ```bash
+   feishu-cli perm transfer-owner <document_id> --doc-type docx --member-type email --member-id user@example.com --notification
+   ```
+3. 发送飞书消息通知用户文档已创建
 
 ## 核心概念
 

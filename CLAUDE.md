@@ -336,27 +336,18 @@ feishu-cli search messages "关键词" --user-access-token <token>
 
 ## Claude Code 技能
 
-本项目提供以下 Claude Code 技能，位于 `skills/` 目录：
+本项目提供以下 Claude Code 技能，位于 `skills/` 目录（8 个技能）：
 
 | 技能 | 说明 | 用法 |
 |------|------|------|
 | `/feishu-cli-read` | 读取飞书文档/知识库并转换为 Markdown | `/feishu-cli-read <doc_id\|url>` |
-| `/feishu-cli-write` | 创建或更新飞书文档 | `/feishu-cli-write "标题"` |
-| `/feishu-cli-create` | 快速创建空白文档 | `/feishu-cli-create "标题"` |
-| `/feishu-cli-export` | 导出文档为 Markdown | `/feishu-cli-export <doc_id> [path]` |
+| `/feishu-cli-write` | 创建/写入飞书文档（含快速创建空白文档） | `/feishu-cli-write "标题"` |
 | `/feishu-cli-import` | 从 Markdown 导入创建文档 | `/feishu-cli-import <file.md>` |
-| `/feishu-cli-wiki` | 知识库操作 | `/feishu-cli-wiki get <node_token>` |
-| `/feishu-cli-sheet` | 电子表格操作（V2/V3 API） | `/feishu-cli-sheet <token>` |
-| `/feishu-cli-file` | 云空间文件管理 | `/feishu-cli-file list [folder_token]` |
-| `/feishu-cli-comment` | 文档评论操作 | `/feishu-cli-comment list <file_token>` |
-| `/feishu-cli-media` | 素材管理 | `/feishu-cli-media upload <file>` |
-| `/feishu-cli-msg` | 消息发送 | `/feishu-cli-msg <receive_id>` |
+| `/feishu-cli-export` | 导出为 Markdown/PDF/Word，或从 DOCX 导入 | `/feishu-cli-export <doc_id> [path]` |
 | `/feishu-cli-perm` | 权限管理 | `/feishu-cli-perm <doc_token>` |
-| `/feishu-cli-board` | 画板操作（导入图表、下载图片） | `/feishu-cli-board <whiteboard_id>` |
-| `/feishu-cli-plantuml` | PlantUML 生成（飞书画板安全子集） | `/feishu-cli-plantuml <描述>` |
-| `/feishu-cli-calendar` | 日历和日程管理 | `/feishu-cli-calendar list` |
-| `/feishu-cli-task` | 任务管理 | `/feishu-cli-task list` |
-| `/feishu-cli-search` | 搜索功能（需 User Access Token） | `/feishu-cli-search messages "关键词"` |
+| `/feishu-cli-msg` | 消息全功能管理（发送/回复/转发/Reaction/Pin） | `/feishu-cli-msg <receive_id>` |
+| `/feishu-cli-toolkit` | 综合工具箱（表格/日历/任务/群聊/画板/文件/素材/评论/知识库/搜索/通讯录） | `/feishu-cli-toolkit` |
+| `feishu-cli-doc-guide` | 飞书文档创建规范（内部参考，不可直接调用） | — |
 
 ### 支持的 URL 格式
 

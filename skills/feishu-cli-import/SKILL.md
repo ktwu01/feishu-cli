@@ -1,6 +1,9 @@
 ---
 name: feishu-cli-import
-description: 从 Markdown 文件导入创建飞书文档，支持嵌套列表、Mermaid/PlantUML 图表自动转画板、大表格自动拆分。当用户请求"导入 Markdown"、"从 md 创建文档"、"上传 Markdown"时使用。
+description: >-
+  从 Markdown 文件导入创建飞书文档。支持嵌套列表、Mermaid/PlantUML 图表自动转画板、
+  大表格自动拆分、公式、Callout 高亮块。当用户请求"导入 Markdown"、"从 md 创建文档"、
+  "上传 Markdown"、"Markdown 转飞书"、"md 导入"时使用。
 argument-hint: <markdown_file> [--title "标题"] [--verbose]
 user-invocable: true
 allowed-tools: Bash, Read

@@ -1,6 +1,10 @@
 ---
 name: feishu-cli-export
-description: 将飞书文档或知识库文档导出为 Markdown 文件。当用户请求"导出文档"、"转换为 Markdown"、"保存为 md"时使用。Markdown 作为中间格式存储在 /tmp 目录。
+description: >-
+  将飞书文档或知识库文档导出为 Markdown 文件，或导出为 PDF/Word/Excel 等格式（异步任务）。
+  也支持从本地 DOCX/XLSX 文件导入为飞书云文档。当用户请求"导出文档"、"转换为 Markdown"、
+  "保存为 md"、"导出 PDF"、"导出 Word"、"docx 转飞书"、"导入 docx"时使用。
+  Markdown 作为中间格式存储在 /tmp 目录。
 argument-hint: <document_id|node_token|url> [output_path]
 user-invocable: true
 allowed-tools: Bash, Read
@@ -8,7 +12,7 @@ allowed-tools: Bash, Read
 
 # 飞书文档导出技能
 
-将飞书云文档或知识库文档导出为本地 Markdown 文件。
+将飞书云文档或知识库文档导出为本地 Markdown 文件，或导出为 PDF/Word 等格式。
 
 ## 核心概念
 
@@ -320,3 +324,75 @@ Callout 内部子块（段落、列表等）会在引用语法内逐行展示。
 | `<u>下划线</u>` → 下划线样式 | 下划线样式 → `<u>下划线</u>` |
 
 **注意**：Mermaid/PlantUML 图表导入后会转换为飞书画板，导出时生成的是画板链接而非原始图表代码。
+
+---
+
+## 异步导出为 PDF/Word/Excel（doc export-file）
+
+将飞书云文档导出为 PDF、Word 等格式（异步三步流程）：
+
+### 执行流程
+
+```bash
+# 一条命令完成全部流程（内部自动创建任务→轮询→下载）
+feishu-cli doc export-file <doc_token> --type pdf -o output.pdf
+```
+
+### 支持的导出格式
+
+| --type | 格式 | 说明 |
+|--------|------|------|
+| `pdf` | PDF | 保留排版 |
+| `docx` | Word | 可编辑 |
+
+### 参数
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `<doc_token>` | 文档 Token | 必填 |
+| `--type` | 导出格式 | 必填 |
+| `-o, --output` | 输出文件路径 | 必填 |
+
+### 示例
+
+```bash
+# 导出为 PDF
+feishu-cli doc export-file JKbxdRez1oNWEKxPz14cWMpBnKh --type pdf -o /tmp/report.pdf
+
+# 导出为 Word
+feishu-cli doc export-file JKbxdRez1oNWEKxPz14cWMpBnKh --type docx -o /tmp/report.docx
+```
+
+---
+
+## 从本地文件导入为飞书云文档（doc import-file）
+
+将本地 DOCX/XLSX 等文件导入为飞书云文档（异步流程）：
+
+### 执行流程
+
+```bash
+# 一条命令完成全部流程（内部自动上传→创建任务→轮询）
+feishu-cli doc import-file local_file.docx --type docx --name "文档名称"
+```
+
+### 支持的导入格式
+
+| --type | 格式 | 说明 |
+|--------|------|------|
+| `docx` | Word 文档 | 转换为飞书文档 |
+
+### 参数
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `<local_path>` | 本地文件路径 | 必填 |
+| `--type` | 文件类型 | 必填 |
+| `--name` | 飞书文档名称 | 文件名 |
+
+### 示例
+
+```bash
+# 导入 Word 文档
+feishu-cli doc import-file ~/Documents/report.docx --type docx --name "季度报告"
+```

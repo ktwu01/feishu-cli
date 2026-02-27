@@ -1,6 +1,9 @@
 ---
 name: feishu-cli-perm
-description: 飞书云文档权限管理。支持添加/删除/查看协作者、公开权限管理、分享密码、批量添加、权限检查、转移所有权。
+description: >-
+  飞书云文档权限管理。支持添加/删除/查看协作者、公开权限管理、分享密码、批量添加、
+  权限检查、转移所有权。当用户请求"添加权限"、"权限管理"、"共享文档"、"授权"、
+  "协作者"、"full_access"、"转移所有权"时使用。
 argument-hint: <doc_token> --perm <view|edit|full_access>
 user-invocable: true
 allowed-tools: Bash, Read

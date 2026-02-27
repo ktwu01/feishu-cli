@@ -121,3 +121,14 @@ folder "This is my folder" {
 - 飞书画板 PlantUML 版本较旧（约 1.2023.13），ArchiMate sprite 不完整
 - 出现 `No such internal sprite` 时，移除对应 sprite
 - 建议改用组件图表达架构
+
+## Mermaid vs PlantUML 选择指南
+
+**默认推荐 Mermaid**，飞书原生支持更好。仅在以下场景使用 PlantUML：
+
+| 场景 | 推荐 |
+|------|------|
+| 流程图/时序图/类图/ER图/甘特图/饼图/状态图/思维导图 | Mermaid |
+| 用例图 | PlantUML |
+| 组件图/部署图 | PlantUML |
+| 复杂活动图（泳道、fork） | PlantUML |
