@@ -614,10 +614,10 @@ feishu-cli dept children <department_id>
 | 画板 | `board:whiteboard` | 画板读写 |
 | 电子表格 | `sheets:spreadsheet` | 电子表格读写 |
 | 素材管理 | `subscriptions:image` | 上传下载, 需单独申请 |
-| 用户信息 | `contact:user.base:readonly` | 获取用户信息,需单独申请 |
+| 用户信息 | `contact:user.base:readonly` | 获取用户信息, 需单独申请 |
 | 通讯录 | `contact:contact.base:readonly` | 需单独申请 |
 | 部分搜索 | `directory:department:search` | 需单独申请 |
-| 日历 | `calendar:calendarr` | 需单独申请 |
+| 日历 | `calendar:calendar` | 需单独申请 |
 | 任务 | `task:task:read`, `task:task:write` | 需单独申请 |
 | 任务列表 | `task:tasklist:read`, `task:tasklist:write` | 任务列表管理 |
 | 搜索消息/应用 | 需要 User Access Token | 通过 `auth login` 或手动获取 |
@@ -691,7 +691,10 @@ feishu-cli dept children <department_id>
 {
   "scopes": {
     "tenant": [
+      "board:whiteboard:node:create",
       "board:whiteboard:node:delete",
+      "board:whiteboard:node:read",
+      "board:whiteboard:node:update",
       "calendar:calendar.acl:create",
       "calendar:calendar.acl:delete",
       "calendar:calendar.acl:read",
@@ -700,6 +703,7 @@ feishu-cli dept children <department_id>
       "calendar:calendar.event:read",
       "calendar:calendar.event:reply",
       "calendar:calendar.event:update",
+      "calendar:calendar.free_busy:read",
       "calendar:calendar:create",
       "calendar:calendar:delete",
       "calendar:calendar:read",
@@ -707,14 +711,19 @@ feishu-cli dept children <department_id>
       "calendar:calendar:update",
       "contact:contact.base:readonly",
       "contact:user.base:readonly",
-      "subscriptions:image",
-      "task:task:read",
-      "task:task:write",
-      "task:tasklist:write",
-      "board:whiteboard:node:create",
-      "board:whiteboard:node:read",
-      "board:whiteboard:node:update",
-      "calendar:calendar.free_busy:read",
+      "docs:document.comment:create",
+      "docs:document.comment:read",
+      "docs:document.comment:update",
+      "docs:document.comment:write_only",
+      "docs:permission.member:create",
+      "docx:document.block:convert",
+      "docx:document:create",
+      "docx:document:readonly",
+      "docx:document:write_only",
+      "drive:drive.metadata:readonly",
+      "drive:drive.search:readonly",
+      "drive:drive:version",
+      "drive:drive:version:readonly",
       "im:chat.announcement:read",
       "im:chat.announcement:write_only",
       "im:chat.chat_pins:read",
@@ -739,35 +748,26 @@ feishu-cli dept children <department_id>
       "im:chat:operate_as_owner",
       "im:chat:read",
       "im:chat:update",
-      "im:message:readonly",
-      "sheets:spreadsheet.meta:read",
-      "sheets:spreadsheet.meta:write_only",
-      "sheets:spreadsheet:create",
-      "sheets:spreadsheet:read",
-      "sheets:spreadsheet:write_only",
-      "task:tasklist:read",
-      "docs:document.comment:create",
-      "docs:document.comment:update",
-      "docx:document.block:convert",
-      "docx:document:write_only",
-      "drive:drive:version",
-      "wiki:member:create",
-      "wiki:member:retrieve",
-      "wiki:member:update",
-      "docs:document.comment:read",
-      "docs:document.comment:write_only",
-      "docs:permission.member:create",
-      "docx:document:create",
-      "docx:document:readonly",
-      "drive:drive.metadata:readonly",
-      "drive:drive.search:readonly",
-      "drive:drive:version:readonly",
       "im:message",
       "im:message.pins:read",
       "im:message.pins:write_only",
       "im:message.reactions:read",
       "im:message.reactions:write_only",
+      "im:message:readonly",
       "im:message:send_as_bot",
+      "sheets:spreadsheet.meta:read",
+      "sheets:spreadsheet.meta:write_only",
+      "sheets:spreadsheet:create",
+      "sheets:spreadsheet:read",
+      "sheets:spreadsheet:write_only",
+      "subscriptions:image",
+      "task:task:read",
+      "task:task:write",
+      "task:tasklist:read",
+      "task:tasklist:write",
+      "wiki:member:create",
+      "wiki:member:retrieve",
+      "wiki:member:update",
       "wiki:wiki:readonly"
     ],
     "user": []
