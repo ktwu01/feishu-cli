@@ -199,7 +199,8 @@ type CreateBoardNotesOptions struct {
 	UserIDType  string // open_id, union_id, user_id
 }
 
-// CreateBoardNodes creates nodes on a whiteboard
+// CreateBoardNodes creates nodes on a whiteboard.
+// nodesJSON should be a JSON array of node objects, e.g. [{"type":"composite_shape",...}]
 func CreateBoardNodes(whiteboardID string, nodesJSON string, opts CreateBoardNotesOptions) ([]string, error) {
 	client, err := GetClient()
 	if err != nil {
@@ -211,14 +212,15 @@ func CreateBoardNodes(whiteboardID string, nodesJSON string, opts CreateBoardNot
 		opts.UserIDType = "open_id"
 	}
 
-	// Build request body - nodes_str is a JSON string
-	reqBody := map[string]any{
-		"nodes_str": nodesJSON,
+	// Parse nodesJSON as a JSON array so it gets sent as {"nodes": [...]}
+	var nodes []json.RawMessage
+	if err := json.Unmarshal([]byte(nodesJSON), &nodes); err != nil {
+		return nil, fmt.Errorf("解析节点 JSON 失败（需要 JSON 数组格式）: %w", err)
 	}
 
-	bodyBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("序列化请求失败: %w", err)
+	// Build request body with parsed nodes array
+	reqBody := map[string]any{
+		"nodes": nodes,
 	}
 
 	apiPath := fmt.Sprintf("/open-apis/board/v1/whiteboards/%s/nodes?user_id_type=%s", whiteboardID, opts.UserIDType)
@@ -226,7 +228,7 @@ func CreateBoardNodes(whiteboardID string, nodesJSON string, opts CreateBoardNot
 		apiPath += "&client_token=" + opts.ClientToken
 	}
 
-	resp, err := client.Post(Context(), apiPath, bodyBytes, larkcore.AccessTokenTypeTenant)
+	resp, err := client.Post(Context(), apiPath, reqBody, larkcore.AccessTokenTypeTenant)
 	if err != nil {
 		return nil, fmt.Errorf("创建画板节点失败: %w", err)
 	}
@@ -236,14 +238,12 @@ func CreateBoardNodes(whiteboardID string, nodesJSON string, opts CreateBoardNot
 		return nil, fmt.Errorf("创建画板节点失败: HTTP %d, body: %s", resp.StatusCode, string(resp.RawBody))
 	}
 
-	// Parse response
+	// Parse response — API returns {"data": {"ids": ["id1", "id2", ...]}}
 	var apiResp struct {
 		Code int    `json:"code"`
 		Msg  string `json:"msg"`
 		Data struct {
-			AddedNodes []struct {
-				NodeID string `json:"node_id"`
-			} `json:"added_nodes"`
+			IDs []string `json:"ids"`
 		} `json:"data"`
 	}
 
@@ -255,12 +255,7 @@ func CreateBoardNodes(whiteboardID string, nodesJSON string, opts CreateBoardNot
 		return nil, fmt.Errorf("创建画板节点失败: code=%d, msg=%s", apiResp.Code, apiResp.Msg)
 	}
 
-	var nodeIDs []string
-	for _, node := range apiResp.Data.AddedNodes {
-		nodeIDs = append(nodeIDs, node.NodeID)
-	}
-
-	return nodeIDs, nil
+	return apiResp.Data.IDs, nil
 }
 
 // DownloadBoardImageByURL downloads image from URL and saves to file

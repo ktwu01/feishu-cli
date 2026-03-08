@@ -100,11 +100,28 @@ feishu-cli doc add-board <document_id> --parent-id <block_id> --index 0
 | `board:board` | 画板操作 |
 | `docx:document` | 文档中添加画板 |
 
+## 创建画板节点
+
+通过 JSON 批量创建画板节点（形状、连接线等）：
+
+```bash
+# 从文件创建节点
+feishu-cli board create-notes <whiteboard_id> nodes.json
+
+# 直接传入 JSON
+feishu-cli board create-notes <whiteboard_id> '[{"type":"composite_shape","x":100,"y":100,"width":200,"height":50,"composite_shape":{"type":"round_rect"},"text":{"text":"Hello"},"style":{"fill_color":"#8569cb","border_style":"none","fill_opacity":100}}]' --source-type content
+
+# JSON 输出（返回节点 ID 列表）
+feishu-cli board create-notes <whiteboard_id> nodes.json -o json
+```
+
+详细的节点格式和高级用法请参考 `references/board-node-api.md`。
+
 ## 已知限制
 
 | 限制 | 说明 |
 |------|------|
 | `board import` CLI 命令 | 单独导入画板时 API 返回 404（API 限制） |
-| `board create-notes` | API 格式问题（API 限制） |
 | Mermaid 花括号 | `{text}` 被识别为菱形节点，需避免 |
 | Mermaid par 语法 | `par...and...end` 飞书不支持 |
+| 画板无 PATCH/DELETE API | 修改节点需重建画板（redraw 模式） |
