@@ -52,7 +52,7 @@ var moveWikiNodeCmd = &cobra.Command{
 		output, _ := cmd.Flags().GetString("output")
 
 		// 先获取节点信息以获取当前 space_id
-		token := client.GetUserAccessToken(cmd)
+		token := resolveOptionalUserToken(cmd)
 		node, err := client.GetWikiNode(nodeToken, token)
 		if err != nil {
 			return fmt.Errorf("获取节点信息失败: %w", err)

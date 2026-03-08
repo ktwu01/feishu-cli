@@ -8,8 +8,19 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/riba2534/feishu-cli/internal/auth"
+	"github.com/riba2534/feishu-cli/internal/config"
 	"github.com/spf13/cobra"
 )
+
+// resolveOptionalUserToken 尝试解析 user_access_token（可选）
+// 有 token 时使用用户身份，无 token 时回退到应用身份（tenant token）
+func resolveOptionalUserToken(cmd *cobra.Command) string {
+	flagToken, _ := cmd.Flags().GetString("user-access-token")
+	cfg := config.Get()
+	token, _ := auth.ResolveUserAccessToken(flagToken, cfg.UserAccessToken, cfg.AppID, cfg.AppSecret, cfg.BaseURL)
+	return token
+}
 
 // mustMarkFlagRequired 标记 flag 为必填，如果失败则 panic
 // 用于 init() 函数中，确保配置错误在启动时被发现

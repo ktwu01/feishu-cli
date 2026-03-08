@@ -39,7 +39,7 @@ var deleteWikiNodeCmd = &cobra.Command{
 		force, _ := cmd.Flags().GetBool("force")
 
 		// 先获取节点信息以获取 obj_token 和 obj_type
-		node, err := client.GetWikiNode(nodeToken, client.GetUserAccessToken(cmd))
+		node, err := client.GetWikiNode(nodeToken, resolveOptionalUserToken(cmd))
 		if err != nil {
 			return fmt.Errorf("获取节点信息失败: %w", err)
 		}

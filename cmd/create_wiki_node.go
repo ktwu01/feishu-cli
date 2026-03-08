@@ -47,7 +47,7 @@ var createWikiNodeCmd = &cobra.Command{
 		nodeType, _ := cmd.Flags().GetString("node-type")
 		output, _ := cmd.Flags().GetString("output")
 
-		result, err := client.CreateWikiNode(spaceID, title, parentNode, nodeType, client.GetUserAccessToken(cmd))
+		result, err := client.CreateWikiNode(spaceID, title, parentNode, nodeType, resolveOptionalUserToken(cmd))
 		if err != nil {
 			return err
 		}

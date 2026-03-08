@@ -37,7 +37,7 @@ var updateWikiNodeCmd = &cobra.Command{
 		title, _ := cmd.Flags().GetString("title")
 
 		// 先获取节点信息以获取 space_id
-		token := client.GetUserAccessToken(cmd)
+		token := resolveOptionalUserToken(cmd)
 		node, err := client.GetWikiNode(nodeToken, token)
 		if err != nil {
 			return fmt.Errorf("获取节点信息失败: %w", err)
