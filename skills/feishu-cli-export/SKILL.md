@@ -396,3 +396,10 @@ feishu-cli doc import-file local_file.docx --type docx --name "文档名称"
 # 导入 Word 文档
 feishu-cli doc import-file ~/Documents/report.docx --type docx --name "季度报告"
 ```
+
+### 已知问题
+
+> **注意**：`doc import-file` 不提供 `--folder` 时会报 `field validation failed`
+> （API 的 mount point 为必填，但 CLI 标记为可选）。
+> **解决方法**：始终传入 `--folder` 参数指定目标文件夹 Token，例如：
+> `feishu-cli doc import-file report.docx --type docx --folder fldcnXXX`
