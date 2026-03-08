@@ -28,7 +28,7 @@ var wikiSpaceGetCmd = &cobra.Command{
 		spaceID := args[0]
 		output, _ := cmd.Flags().GetString("output")
 
-		space, err := client.GetWikiSpace(spaceID)
+		space, err := client.GetWikiSpace(spaceID, client.GetUserAccessToken(cmd))
 		if err != nil {
 			return err
 		}
@@ -55,4 +55,5 @@ var wikiSpaceGetCmd = &cobra.Command{
 func init() {
 	wikiCmd.AddCommand(wikiSpaceGetCmd)
 	wikiSpaceGetCmd.Flags().StringP("output", "o", "", "输出格式（json）")
+	wikiSpaceGetCmd.Flags().String("user-access-token", "", "User Access Token（可选，用于访问个人知识库）")
 }

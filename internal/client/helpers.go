@@ -1,6 +1,18 @@
 package client
 
-import "strings"
+import (
+	"strings"
+
+	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
+)
+
+// UserTokenOption 当 userAccessToken 非空时返回请求选项，否则返回 nil（回退到 tenant token）
+func UserTokenOption(userAccessToken string) []larkcore.RequestOptionFunc {
+	if userAccessToken != "" {
+		return []larkcore.RequestOptionFunc{larkcore.WithUserAccessToken(userAccessToken)}
+	}
+	return nil
+}
 
 // StringVal 安全解引用字符串指针，nil 返回空字符串
 func StringVal(p *string) string {

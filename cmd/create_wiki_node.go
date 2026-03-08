@@ -47,7 +47,7 @@ var createWikiNodeCmd = &cobra.Command{
 		nodeType, _ := cmd.Flags().GetString("node-type")
 		output, _ := cmd.Flags().GetString("output")
 
-		result, err := client.CreateWikiNode(spaceID, title, parentNode, nodeType)
+		result, err := client.CreateWikiNode(spaceID, title, parentNode, nodeType, client.GetUserAccessToken(cmd))
 		if err != nil {
 			return err
 		}
@@ -76,4 +76,5 @@ func init() {
 	createWikiNodeCmd.Flags().String("node-type", "docx", "节点类型：docx/doc/sheet（默认 docx）")
 	createWikiNodeCmd.Flags().StringP("output", "o", "", "输出格式（json）")
 	mustMarkFlagRequired(createWikiNodeCmd, "space-id", "title")
+	createWikiNodeCmd.Flags().String("user-access-token", "", "User Access Token（可选，用于访问个人知识库）")
 }

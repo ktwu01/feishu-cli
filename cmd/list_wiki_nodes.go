@@ -46,7 +46,7 @@ var listWikiNodesCmd = &cobra.Command{
 		pageSize, _ := cmd.Flags().GetInt("page-size")
 		output, _ := cmd.Flags().GetString("output")
 
-		nodes, _, _, err := client.ListWikiNodes(spaceID, parentToken, pageSize, "")
+		nodes, _, _, err := client.ListWikiNodes(spaceID, parentToken, pageSize, "", client.GetUserAccessToken(cmd))
 		if err != nil {
 			return err
 		}
@@ -83,4 +83,5 @@ func init() {
 	listWikiNodesCmd.Flags().String("parent", "", "父节点 Token（不指定则列出根节点）")
 	listWikiNodesCmd.Flags().Int("page-size", 50, "每页数量")
 	listWikiNodesCmd.Flags().StringP("output", "o", "", "输出格式（json）")
+	listWikiNodesCmd.Flags().String("user-access-token", "", "User Access Token（可选，用于访问个人知识库）")
 }

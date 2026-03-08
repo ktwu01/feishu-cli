@@ -58,7 +58,7 @@ var exportWikiCmd = &cobra.Command{
 
 		// 1. 获取节点信息
 		fmt.Printf("正在获取节点信息: %s\n", nodeToken)
-		node, err := client.GetWikiNode(nodeToken)
+		node, err := client.GetWikiNode(nodeToken, client.GetUserAccessToken(cmd))
 		if err != nil {
 			return err
 		}
@@ -134,4 +134,5 @@ func init() {
 	exportWikiCmd.Flags().StringP("output", "o", "", "输出文件路径")
 	exportWikiCmd.Flags().Bool("download-images", false, "下载图片到本地目录")
 	exportWikiCmd.Flags().String("assets-dir", "./assets", "下载资源的保存目录")
+	exportWikiCmd.Flags().String("user-access-token", "", "User Access Token（可选，用于访问个人知识库）")
 }

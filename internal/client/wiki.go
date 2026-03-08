@@ -32,7 +32,7 @@ type WikiSpace struct {
 }
 
 // GetWikiNode 获取知识库节点信息
-func GetWikiNode(token string) (*WikiNode, error) {
+func GetWikiNode(token string, userAccessToken string) (*WikiNode, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func GetWikiNode(token string) (*WikiNode, error) {
 		Token(token).
 		Build()
 
-	resp, err := client.Wiki.Space.GetNode(Context(), req)
+	resp, err := client.Wiki.Space.GetNode(Context(), req, UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return nil, fmt.Errorf("获取节点信息失败: %w", err)
 	}
@@ -73,7 +73,7 @@ func GetWikiNode(token string) (*WikiNode, error) {
 }
 
 // ListWikiSpaces 获取知识空间列表
-func ListWikiSpaces(pageSize int, pageToken string) ([]*WikiSpace, string, bool, error) {
+func ListWikiSpaces(pageSize int, pageToken string, userAccessToken string) ([]*WikiSpace, string, bool, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, "", false, err
@@ -87,7 +87,7 @@ func ListWikiSpaces(pageSize int, pageToken string) ([]*WikiSpace, string, bool,
 		reqBuilder.PageToken(pageToken)
 	}
 
-	resp, err := client.Wiki.Space.List(Context(), reqBuilder.Build())
+	resp, err := client.Wiki.Space.List(Context(), reqBuilder.Build(), UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return nil, "", false, fmt.Errorf("获取知识空间列表失败: %w", err)
 	}
@@ -120,7 +120,7 @@ func ListWikiSpaces(pageSize int, pageToken string) ([]*WikiSpace, string, bool,
 }
 
 // ListWikiNodes 获取知识空间下的节点列表
-func ListWikiNodes(spaceID string, parentNodeToken string, pageSize int, pageToken string) ([]*WikiNode, string, bool, error) {
+func ListWikiNodes(spaceID string, parentNodeToken string, pageSize int, pageToken string, userAccessToken string) ([]*WikiNode, string, bool, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, "", false, err
@@ -139,7 +139,7 @@ func ListWikiNodes(spaceID string, parentNodeToken string, pageSize int, pageTok
 		reqBuilder.PageToken(pageToken)
 	}
 
-	resp, err := client.Wiki.SpaceNode.List(Context(), reqBuilder.Build())
+	resp, err := client.Wiki.SpaceNode.List(Context(), reqBuilder.Build(), UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return nil, "", false, fmt.Errorf("获取节点列表失败: %w", err)
 	}
@@ -185,7 +185,7 @@ type CreateWikiNodeResult struct {
 }
 
 // CreateWikiNode 在知识空间中创建节点
-func CreateWikiNode(spaceID, title, parentNode, nodeType string) (*CreateWikiNodeResult, error) {
+func CreateWikiNode(spaceID, title, parentNode, nodeType string, userAccessToken string) (*CreateWikiNodeResult, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, err
@@ -208,7 +208,7 @@ func CreateWikiNode(spaceID, title, parentNode, nodeType string) (*CreateWikiNod
 		Node(nodeBuilder.Build()).
 		Build()
 
-	resp, err := client.Wiki.SpaceNode.Create(Context(), req)
+	resp, err := client.Wiki.SpaceNode.Create(Context(), req, UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return nil, fmt.Errorf("创建知识库节点失败: %w", err)
 	}
@@ -231,7 +231,7 @@ func CreateWikiNode(spaceID, title, parentNode, nodeType string) (*CreateWikiNod
 }
 
 // UpdateWikiNode 更新知识库节点标题
-func UpdateWikiNode(spaceID, nodeToken, title string) error {
+func UpdateWikiNode(spaceID, nodeToken, title string, userAccessToken string) error {
 	client, err := GetClient()
 	if err != nil {
 		return err
@@ -247,7 +247,7 @@ func UpdateWikiNode(spaceID, nodeToken, title string) error {
 		Body(body).
 		Build()
 
-	resp, err := client.Wiki.SpaceNode.UpdateTitle(Context(), req)
+	resp, err := client.Wiki.SpaceNode.UpdateTitle(Context(), req, UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return fmt.Errorf("更新知识库节点标题失败: %w", err)
 	}
@@ -278,7 +278,7 @@ type WikiSpaceMember struct {
 }
 
 // GetWikiSpace 获取知识空间详情
-func GetWikiSpace(spaceID string) (*WikiSpaceDetail, error) {
+func GetWikiSpace(spaceID string, userAccessToken string) (*WikiSpaceDetail, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, err
@@ -288,7 +288,7 @@ func GetWikiSpace(spaceID string) (*WikiSpaceDetail, error) {
 		SpaceId(spaceID).
 		Build()
 
-	resp, err := client.Wiki.Space.Get(Context(), req)
+	resp, err := client.Wiki.Space.Get(Context(), req, UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return nil, fmt.Errorf("获取知识空间详情失败: %w", err)
 	}
@@ -313,7 +313,7 @@ func GetWikiSpace(spaceID string) (*WikiSpaceDetail, error) {
 }
 
 // AddWikiSpaceMember 添加知识空间成员
-func AddWikiSpaceMember(spaceID, memberType, memberID, memberRole string) error {
+func AddWikiSpaceMember(spaceID, memberType, memberID, memberRole string, userAccessToken string) error {
 	client, err := GetClient()
 	if err != nil {
 		return err
@@ -331,7 +331,7 @@ func AddWikiSpaceMember(spaceID, memberType, memberID, memberRole string) error 
 		NeedNotification(true).
 		Build()
 
-	resp, err := client.Wiki.SpaceMember.Create(Context(), req)
+	resp, err := client.Wiki.SpaceMember.Create(Context(), req, UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return fmt.Errorf("添加知识空间成员失败: %w", err)
 	}
@@ -344,7 +344,7 @@ func AddWikiSpaceMember(spaceID, memberType, memberID, memberRole string) error 
 }
 
 // ListWikiSpaceMembers 列出知识空间成员
-func ListWikiSpaceMembers(spaceID string, pageSize int, pageToken string) ([]*WikiSpaceMember, string, bool, error) {
+func ListWikiSpaceMembers(spaceID string, pageSize int, pageToken string, userAccessToken string) ([]*WikiSpaceMember, string, bool, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, "", false, err
@@ -360,7 +360,7 @@ func ListWikiSpaceMembers(spaceID string, pageSize int, pageToken string) ([]*Wi
 		reqBuilder.PageToken(pageToken)
 	}
 
-	resp, err := client.Wiki.SpaceMember.List(Context(), reqBuilder.Build())
+	resp, err := client.Wiki.SpaceMember.List(Context(), reqBuilder.Build(), UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return nil, "", false, fmt.Errorf("获取知识空间成员列表失败: %w", err)
 	}
@@ -392,7 +392,7 @@ func ListWikiSpaceMembers(spaceID string, pageSize int, pageToken string) ([]*Wi
 }
 
 // RemoveWikiSpaceMember 移除知识空间成员
-func RemoveWikiSpaceMember(spaceID, memberType, memberID, memberRole string) error {
+func RemoveWikiSpaceMember(spaceID, memberType, memberID, memberRole string, userAccessToken string) error {
 	client, err := GetClient()
 	if err != nil {
 		return err
@@ -410,7 +410,7 @@ func RemoveWikiSpaceMember(spaceID, memberType, memberID, memberRole string) err
 		Member(member).
 		Build()
 
-	resp, err := client.Wiki.SpaceMember.Delete(Context(), req)
+	resp, err := client.Wiki.SpaceMember.Delete(Context(), req, UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return fmt.Errorf("移除知识空间成员失败: %w", err)
 	}
@@ -428,7 +428,7 @@ type MoveWikiNodeResult struct {
 }
 
 // MoveWikiNode 移动知识库节点
-func MoveWikiNode(spaceID, nodeToken, targetSpaceID, targetParent string) (*MoveWikiNodeResult, error) {
+func MoveWikiNode(spaceID, nodeToken, targetSpaceID, targetParent string, userAccessToken string) (*MoveWikiNodeResult, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, err
@@ -447,7 +447,7 @@ func MoveWikiNode(spaceID, nodeToken, targetSpaceID, targetParent string) (*Move
 		Body(bodyBuilder.Build()).
 		Build()
 
-	resp, err := client.Wiki.SpaceNode.Move(Context(), req)
+	resp, err := client.Wiki.SpaceNode.Move(Context(), req, UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return nil, fmt.Errorf("移动知识库节点失败: %w", err)
 	}

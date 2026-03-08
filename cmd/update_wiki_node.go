@@ -37,12 +37,13 @@ var updateWikiNodeCmd = &cobra.Command{
 		title, _ := cmd.Flags().GetString("title")
 
 		// 先获取节点信息以获取 space_id
-		node, err := client.GetWikiNode(nodeToken)
+		token := client.GetUserAccessToken(cmd)
+		node, err := client.GetWikiNode(nodeToken, token)
 		if err != nil {
 			return fmt.Errorf("获取节点信息失败: %w", err)
 		}
 
-		err = client.UpdateWikiNode(node.SpaceID, nodeToken, title)
+		err = client.UpdateWikiNode(node.SpaceID, nodeToken, title, token)
 		if err != nil {
 			return err
 		}
@@ -59,4 +60,5 @@ func init() {
 	wikiCmd.AddCommand(updateWikiNodeCmd)
 	updateWikiNodeCmd.Flags().String("title", "", "新标题（必填）")
 	mustMarkFlagRequired(updateWikiNodeCmd, "title")
+	updateWikiNodeCmd.Flags().String("user-access-token", "", "User Access Token（可选，用于访问个人知识库）")
 }

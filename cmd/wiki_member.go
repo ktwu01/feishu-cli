@@ -59,7 +59,7 @@ var wikiMemberAddCmd = &cobra.Command{
 		memberID, _ := cmd.Flags().GetString("member-id")
 		role, _ := cmd.Flags().GetString("role")
 
-		if err := client.AddWikiSpaceMember(spaceID, memberType, memberID, role); err != nil {
+		if err := client.AddWikiSpaceMember(spaceID, memberType, memberID, role, client.GetUserAccessToken(cmd)); err != nil {
 			return err
 		}
 
@@ -90,7 +90,7 @@ var wikiMemberListCmd = &cobra.Command{
 		pageToken, _ := cmd.Flags().GetString("page-token")
 		output, _ := cmd.Flags().GetString("output")
 
-		members, nextPageToken, hasMore, err := client.ListWikiSpaceMembers(spaceID, pageSize, pageToken)
+		members, nextPageToken, hasMore, err := client.ListWikiSpaceMembers(spaceID, pageSize, pageToken, client.GetUserAccessToken(cmd))
 		if err != nil {
 			return err
 		}
@@ -148,7 +148,7 @@ var wikiMemberRemoveCmd = &cobra.Command{
 		memberID, _ := cmd.Flags().GetString("member-id")
 		role, _ := cmd.Flags().GetString("role")
 
-		if err := client.RemoveWikiSpaceMember(spaceID, memberType, memberID, role); err != nil {
+		if err := client.RemoveWikiSpaceMember(spaceID, memberType, memberID, role, client.GetUserAccessToken(cmd)); err != nil {
 			return err
 		}
 
@@ -165,15 +165,18 @@ func init() {
 	wikiMemberAddCmd.Flags().String("member-id", "", "成员 ID（必填）")
 	wikiMemberAddCmd.Flags().String("role", "", "角色: admin/member（必填）")
 	mustMarkFlagRequired(wikiMemberAddCmd, "member-type", "member-id", "role")
+	wikiMemberAddCmd.Flags().String("user-access-token", "", "User Access Token（可选，用于访问个人知识库）")
 
 	wikiMemberCmd.AddCommand(wikiMemberListCmd)
 	wikiMemberListCmd.Flags().Int("page-size", 0, "每页数量")
 	wikiMemberListCmd.Flags().String("page-token", "", "分页标记")
 	wikiMemberListCmd.Flags().StringP("output", "o", "", "输出格式（json）")
+	wikiMemberListCmd.Flags().String("user-access-token", "", "User Access Token（可选，用于访问个人知识库）")
 
 	wikiMemberCmd.AddCommand(wikiMemberRemoveCmd)
 	wikiMemberRemoveCmd.Flags().String("member-type", "", "成员类型（必填）")
 	wikiMemberRemoveCmd.Flags().String("member-id", "", "成员 ID（必填）")
 	wikiMemberRemoveCmd.Flags().String("role", "", "角色: admin/member（必填）")
 	mustMarkFlagRequired(wikiMemberRemoveCmd, "member-type", "member-id", "role")
+	wikiMemberRemoveCmd.Flags().String("user-access-token", "", "User Access Token（可选，用于访问个人知识库）")
 }

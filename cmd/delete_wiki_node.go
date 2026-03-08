@@ -39,7 +39,7 @@ var deleteWikiNodeCmd = &cobra.Command{
 		force, _ := cmd.Flags().GetBool("force")
 
 		// 先获取节点信息以获取 obj_token 和 obj_type
-		node, err := client.GetWikiNode(nodeToken)
+		node, err := client.GetWikiNode(nodeToken, client.GetUserAccessToken(cmd))
 		if err != nil {
 			return fmt.Errorf("获取节点信息失败: %w", err)
 		}
@@ -74,4 +74,5 @@ var deleteWikiNodeCmd = &cobra.Command{
 func init() {
 	wikiCmd.AddCommand(deleteWikiNodeCmd)
 	deleteWikiNodeCmd.Flags().BoolP("force", "f", false, "跳过确认直接删除")
+	deleteWikiNodeCmd.Flags().String("user-access-token", "", "User Access Token（可选，用于访问个人知识库）")
 }

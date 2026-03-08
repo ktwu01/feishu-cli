@@ -38,7 +38,7 @@ var listWikiSpacesCmd = &cobra.Command{
 		pageSize, _ := cmd.Flags().GetInt("page-size")
 		output, _ := cmd.Flags().GetString("output")
 
-		spaces, _, _, err := client.ListWikiSpaces(pageSize, "")
+		spaces, _, _, err := client.ListWikiSpaces(pageSize, "", client.GetUserAccessToken(cmd))
 		if err != nil {
 			return err
 		}
@@ -78,4 +78,5 @@ func init() {
 	wikiCmd.AddCommand(listWikiSpacesCmd)
 	listWikiSpacesCmd.Flags().Int("page-size", 50, "每页数量")
 	listWikiSpacesCmd.Flags().StringP("output", "o", "", "输出格式（json）")
+	listWikiSpacesCmd.Flags().String("user-access-token", "", "User Access Token（可选，用于访问个人知识库）")
 }
