@@ -351,6 +351,8 @@ feishu-cli search docs "产品需求" --user-access-token <token>
 - **表格列宽**：通过 `TableProperty.ColumnWidth` 设置，单位像素，数组长度需与列数一致
 - **画板 API**：路径 `/open-apis/board/v1/whiteboards/{id}/nodes/plantuml`，`syntax_type=1` PlantUML / `2` Mermaid
 - **diagram_type 映射**：0=auto, 1=mindmap, 2=sequence, 3=activity, 4=class, 5=er, 6=flowchart, 7=state, 8=component
+- **画板图片节点**：上传必须用 `parent_type=whiteboard` + `parent_node=画板ID`；节点格式 `{"image":{"token":"xxx"}}`（嵌套，非顶层）；每个节点需独立 token（不可复用）；API 不支持裁切/遮罩，需预处理图片
+- **画板克隆 GET→POST 清洗**：必须移除 `id`、`locked`、`children`、`parent_id` 字段；`composite_shape` 必须保留完整子结构（`composite_shape.type` + `text`）；批量创建建议每批 10 个、间隔 3s
 
 ### 电子表格
 

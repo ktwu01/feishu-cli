@@ -117,6 +117,30 @@ feishu-cli board create-notes <whiteboard_id> nodes.json -o json
 
 详细的节点格式和高级用法请参考 `references/board-node-api.md`。
 
+## 画板图片节点
+
+画板中插入图片需要特殊的上传和创建流程：
+
+```bash
+# 1. 上传图片（必须用 whiteboard 类型 + 画板 ID）
+feishu-cli media upload image.png --parent-type whiteboard --parent-node <whiteboard_id> -o json
+# 返回 {"file_token": "xxx"}
+
+# 2. 创建图片节点（token 必须嵌套在 image 对象内）
+feishu-cli board create-notes <whiteboard_id> \
+  '[{"type":"image","x":100,"y":100,"width":86,"height":86,"image":{"token":"<file_token>"},"z_index":100}]' \
+  --source-type content
+```
+
+**关键注意事项**：
+- `parent_type` 必须是 `whiteboard`（不是 `docx_image`），否则图片在画板中显示为棋盘格
+- `parent_node` 必须是画板 ID（不是文档 ID）
+- token 格式：`{"image":{"token":"xxx"}}`（嵌套），不能放顶层
+- 每个图片节点需要独立的 token，同一张图片用于多个节点时必须分别上传
+- 圆形头像：API 不支持 `clip`/`mask`/`border_radius`，需预处理图片为圆形后上传
+
+详见 `references/board-node-api.md` 的 image 节点章节。
+
 ## 已知限制
 
 | 限制 | 说明 |
@@ -125,3 +149,5 @@ feishu-cli board create-notes <whiteboard_id> nodes.json -o json
 | Mermaid 花括号 | `{text}` 被识别为菱形节点，需避免 |
 | Mermaid par 语法 | `par...and...end` 飞书不支持 |
 | 画板无 PATCH/DELETE API | 修改节点需重建画板（redraw 模式） |
+| 画板图片裁切 | API 不支持 `clip`/`mask`/`crop_rect`/`border_radius` 等属性，需预处理图片 |
+| 画板图片 token | 每个节点必须独占 token，不可多节点复用同一 token |

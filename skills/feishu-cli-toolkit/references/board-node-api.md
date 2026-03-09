@@ -174,19 +174,90 @@ feishu-cli board create-notes <new_whiteboard_id> remapped_connectors.json -o js
 
 | 层级 | 需移除的字段 | 原因 |
 |------|------------|------|
-| 顶层 | `id`, `locked`, `children` | 只读/系统生成 |
+| 顶层 | `id`, `locked`, `children`, `parent_id` | 只读/系统生成。**`parent_id` 必须移除**，否则 2890002 |
 | `text.*` | `text_color_type` | 未公开的内部字段 |
 | `style.*` | `fill_color_type`, `border_color_type` | 未公开的内部字段 |
 | `connector.*` | `start_object`, `end_object` | 只读，改用 `start`/`end` |
+
+### image（图片节点）
+
+画板图片节点需要特殊处理，有多个关键注意事项：
+
+**创建格式**（token 必须嵌套在 `image` 对象内）：
+
+```json
+{
+  "type": "image",
+  "x": 100, "y": 100, "width": 86, "height": 86,
+  "z_index": 110,
+  "image": {"token": "<file_token>"}
+}
+```
+
+**图片上传**：画板图片必须使用 `parent_type=whiteboard`，`parent_node=画板ID`：
+
+```bash
+feishu-cli media upload image.png --parent-type whiteboard --parent-node <whiteboard_id> -o json
+# 返回 {"file_token": "xxx"}
+```
+
+**⚠️ 关键规则**：
+
+| 规则 | 说明 |
+|------|------|
+| **上传 parent_type** | 必须是 `whiteboard`，用 `docx_image` 上传的 token 在画板中无法渲染（显示棋盘格） |
+| **上传 parent_node** | 必须是目标画板 ID（whiteboard_id），不是文档 ID |
+| **token 嵌套格式** | 必须 `{"image":{"token":"xxx"}}`，不能放顶层 `{"token":"xxx"}`（顶层会被忽略） |
+| **每个节点独占 token** | 同一张图片用于多个节点时，**必须分别上传获得不同 token**，不可复用 |
+| **圆形裁切** | API 不支持 `clip`/`mask`/`border_radius`/`crop_rect` 等裁切属性。需**预处理图片**为圆形后上传 |
+
+**圆形图片预处理**（Python PIL）：
+
+```python
+from PIL import Image, ImageDraw
+
+img = Image.open("avatar.png").convert("RGBA")
+mask = Image.new("L", img.size, 0)
+ImageDraw.Draw(mask).ellipse((0, 0, img.size[0]-1, img.size[1]-1), fill=255)
+output = Image.new("RGBA", img.size, (0, 0, 0, 0))
+output.paste(img, (0, 0), mask)
+output.save("avatar_circle.png")
+```
+
+**完整克隆图片流程**：
+
+```bash
+# 1. 从原始画板获取节点，提取 image 节点的 token 列表
+feishu-cli board nodes <original_board_id> > original.json
+
+# 2. 下载原始图片
+feishu-cli media download <old_token> -o /tmp/images/<old_token>.png
+
+# 3. 预处理为圆形（如果原图是圆形头像）
+
+# 4. 逐个上传到新画板（每个节点一个独立 token）
+feishu-cli media upload image.png --parent-type whiteboard --parent-node <new_board_id> -o json
+
+# 5. 创建图片节点（注意限频，建议每个节点间隔 2s）
+feishu-cli board create-notes <new_board_id> '[{"type":"image",...,"image":{"token":"<new_token>"}}]' --source-type content
+```
+
+## 批量创建的限频与重试
+
+画板节点创建 API 有频率限制（实测约 10-20 req/5s），批量创建时需注意：
+
+- **批量模式**：每批 10 个节点，批间间隔 3 秒
+- **失败重试**：批量失败时改为逐个创建，每个间隔 2 秒
+- **新建画板后**：需等待 5-10 秒画板初始化完成后再创建节点
 
 ## 错误码
 
 | 错误码 | 含义 | 常见原因 |
 |--------|------|---------|
 | 2890001 | invalid format | JSON 格式错误 |
-| 2890002 | invalid arg | 包含未公开字段、连接线格式错误 |
+| 2890002 | invalid arg | 包含 `parent_id` 等未公开字段、连接线格式错误、节点缺少必需子结构（如 composite_shape 缺少 `composite_shape.type` 和 `text` 字段） |
 | 2890003 | record missing | whiteboard_id 不存在 |
-| 2890006 | rate limited | 超过 50 req/s 频率限制 |
+| 2890006 | rate limited | 超过频率限制 |
 
 ## 常用配色参考
 
