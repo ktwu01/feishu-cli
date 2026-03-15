@@ -17,7 +17,8 @@ allowed-tools: Bash, Read
 ## 前置条件
 
 - 需要已配置飞书应用凭证（`FEISHU_APP_ID` / `FEISHU_APP_SECRET`），通过环境变量或 `~/.feishu-cli/config.yaml` 设置
-- 应用需具备 `docx:document` 权限（文档导出）或 `wiki:wiki:readonly` 权限（知识库导出）
+- App 权限：需要 `docx:document` 或 `docx:document:readonly`（文档导出）、`wiki:wiki:readonly`（知识库导出）
+- User Token 权限：若 App 无权访问他人文档，需通过 `feishu-cli auth login --scopes "docx:document:readonly offline_access"` 授权，`doc export` 会自动读取保存的 User Token
 - 使用 `--expand-mentions` 展开 @用户时，还需 `contact:user.base:readonly` 权限
 
 ## 核心概念
@@ -71,6 +72,7 @@ allowed-tools: Bash, Read
 | --front-matter | 添加 YAML front matter（标题和文档 ID） | 否 |
 | --highlight | 保留文本颜色和背景色（输出为 HTML `<span>` 标签） | 否 |
 | --expand-mentions | 展开 @用户为友好格式（需要 contact:user.base:readonly 权限） | 是（默认开启） |
+| --user-access-token | User Access Token（用于访问无 App 权限的文档，未指定时自动从 `auth login` 读取） | 自动读取 |
 
 ## 支持的 URL 格式
 
@@ -181,6 +183,8 @@ ls -la /tmp/doc_assets/
 
 | 错误 | 原因 | 解决 |
 |------|------|------|
+| `code=1770032, msg=forBidden` | App Token 无权限访问该文档 | 通过 `auth login --scopes "docx:document:readonly offline_access"` 授权 User Token，`doc export` 会自动读取 |
+| `code=99991679, msg=Unauthorized` | User Token 缺少 `docx:document:readonly` scope | 重新执行 `feishu-cli auth login --scopes "docx:document:readonly offline_access"` |
 | `code=131002, param err` | 参数错误 | 检查 token 格式 |
 | `code=131001, node not found` | 节点不存在 | 检查 token 是否正确 |
 | `code=131003, no permission` | 无权限访问 | 确认应用有 docx:document 或 wiki:wiki:readonly 权限 |

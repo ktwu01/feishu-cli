@@ -26,6 +26,17 @@ func resolveOptionalUserToken(cmd *cobra.Command) string {
 	return ""
 }
 
+// resolveOptionalUserTokenWithFallback 尝试完整优先级链解析 User Token（可选）
+// 与 resolveOptionalUserToken 不同，会额外尝试从 token.json 和 config 中读取
+// 找不到时返回空字符串（回退到 App Token），而非报错
+// 适用于 doc export 等"能用 App Token 就用，否则 fallback 到 User Token"的场景
+func resolveOptionalUserTokenWithFallback(cmd *cobra.Command) string {
+	flagToken, _ := cmd.Flags().GetString("user-access-token")
+	cfg := config.Get()
+	token, _ := auth.ResolveUserAccessToken(flagToken, cfg.UserAccessToken, cfg.AppID, cfg.AppSecret, cfg.BaseURL)
+	return token
+}
+
 // resolveRequiredUserToken 解析 user_access_token（必需）
 // 用于搜索等必须使用 User Access Token 的 API，解析失败时返回错误
 func resolveRequiredUserToken(cmd *cobra.Command) (string, error) {
