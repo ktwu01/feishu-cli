@@ -12,7 +12,7 @@ import (
 
 var authLoginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "登录授权（获取 User Access Token，通过 --device 来使用 Device Flow 授权模式，免配置回调）",
+	Short: "登录授权（获取 User Access Token）",
 	Long: `通过 OAuth 2.0 完成用户授权，支持两种模式:
 
 Authorization Code Flow（默认）:
