@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/riba2534/feishu-cli/internal/client"
 	"github.com/riba2534/feishu-cli/internal/config"
@@ -21,6 +23,8 @@ var sendMessageCmd = &cobra.Command{
   --content, -c       消息内容 JSON
   --content-file      消息内容 JSON 文件
   --text, -t          简单文本消息（快捷方式）
+  --file, -f          发送本地文件（自动上传并发送，快捷方式）
+  --image             发送本地图片（自动上传并发送，快捷方式）
   --output, -o        输出格式（json）
 
 接收者类型:
@@ -55,6 +59,18 @@ var sendMessageCmd = &cobra.Command{
     --receive-id oc_xxx \
     --text "群消息"
 
+  # 直接发送本地文件（自动上传）
+  feishu-cli msg send \
+    --receive-id-type chat_id \
+    --receive-id oc_xxx \
+    --file /path/to/report.pdf
+
+  # 直接发送本地图片（自动上传）
+  feishu-cli msg send \
+    --receive-id-type chat_id \
+    --receive-id oc_xxx \
+    --image /path/to/screenshot.png
+
   # 发送卡片消息
   feishu-cli msg send \
     --receive-id-type email \
@@ -74,21 +90,49 @@ var sendMessageCmd = &cobra.Command{
 		content, _ := cmd.Flags().GetString("content")
 		contentFile, _ := cmd.Flags().GetString("content-file")
 		text, _ := cmd.Flags().GetString("text")
+		filePath, _ := cmd.Flags().GetString("file")
+		imagePath, _ := cmd.Flags().GetString("image")
 
 		var msgContent string
-		if contentFile != "" {
+		switch {
+		case filePath != "":
+			// Upload file via IM API, then send as file message
+			fmt.Printf("正在上传文件: %s\n", filepath.Base(filePath))
+			fileKey, err := client.UploadIMFile(filePath, "")
+			if err != nil {
+				return err
+			}
+			msgType = "file"
+			contentJSON, _ := json.Marshal(map[string]string{"file_key": fileKey})
+			msgContent = string(contentJSON)
+
+		case imagePath != "":
+			// Upload image via IM API, then send as image message
+			fmt.Printf("正在上传图片: %s\n", filepath.Base(imagePath))
+			imageKey, err := client.UploadIMImage(imagePath)
+			if err != nil {
+				return err
+			}
+			msgType = "image"
+			contentJSON, _ := json.Marshal(map[string]string{"image_key": imageKey})
+			msgContent = string(contentJSON)
+
+		case contentFile != "":
 			data, err := os.ReadFile(contentFile)
 			if err != nil {
 				return fmt.Errorf("读取内容文件失败: %w", err)
 			}
 			msgContent = string(data)
-		} else if content != "" {
+
+		case content != "":
 			msgContent = content
-		} else if text != "" {
+
+		case text != "":
 			msgType = "text"
 			msgContent = client.CreateTextMessageContent(text)
-		} else {
-			return fmt.Errorf("必须指定 --content、--content-file 或 --text")
+
+		default:
+			return fmt.Errorf("必须指定 --content、--content-file、--text、--file 或 --image")
 		}
 
 		messageID, err := client.SendMessage(receiveIDType, receiveID, msgType, msgContent, token)
@@ -120,6 +164,8 @@ func init() {
 	sendMessageCmd.Flags().StringP("content", "c", "", "消息内容 JSON")
 	sendMessageCmd.Flags().String("content-file", "", "消息内容 JSON 文件")
 	sendMessageCmd.Flags().StringP("text", "t", "", "简单文本消息")
+	sendMessageCmd.Flags().StringP("file", "f", "", "发送本地文件（自动上传并发送）")
+	sendMessageCmd.Flags().String("image", "", "发送本地图片（自动上传并发送）")
 	sendMessageCmd.Flags().StringP("output", "o", "", "输出格式（json）")
 	sendMessageCmd.Flags().String("user-access-token", "", "User Access Token（用户授权令牌）")
 	mustMarkFlagRequired(sendMessageCmd, "receive-id-type", "receive-id")

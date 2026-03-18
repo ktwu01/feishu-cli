@@ -44,6 +44,18 @@ var msgCmd = &cobra.Command{
     --receive-id user@example.com \
     --text "你好，这是一条测试消息"
 
+  # 直接发送本地文件（自动上传）
+  feishu-cli msg send \
+    --receive-id-type chat_id \
+    --receive-id oc_xxx \
+    --file /path/to/report.pdf
+
+  # 直接发送本地图片（自动上传）
+  feishu-cli msg send \
+    --receive-id-type chat_id \
+    --receive-id oc_xxx \
+    --image /path/to/screenshot.png
+
   # 回复消息
   feishu-cli msg reply om_xxx --text "收到！"
 
