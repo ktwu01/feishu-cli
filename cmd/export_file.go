@@ -55,9 +55,12 @@ var exportFileCmd = &cobra.Command{
 			outputPath = fmt.Sprintf("%s.%s", docToken, fileType)
 		}
 
+		// 获取可选的 User Access Token
+		userAccessToken := resolveOptionalUserTokenWithFallback(cmd)
+
 		// 创建导出任务
 		fmt.Printf("正在创建导出任务...\n")
-		ticket, err := client.CreateExportTask(docToken, docType, fileType)
+		ticket, err := client.CreateExportTask(docToken, docType, fileType, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -65,7 +68,7 @@ var exportFileCmd = &cobra.Command{
 
 		// 轮询等待任务完成
 		fmt.Printf("正在等待导出完成...\n")
-		fileToken, err := client.WaitExportTask(ticket, docToken, 60)
+		fileToken, err := client.WaitExportTask(ticket, docToken, userAccessToken, 60)
 		if err != nil {
 			return err
 		}
@@ -73,7 +76,7 @@ var exportFileCmd = &cobra.Command{
 
 		// 下载导出文件
 		fmt.Printf("正在下载文件...\n")
-		if err := client.DownloadExportFile(fileToken, outputPath); err != nil {
+		if err := client.DownloadExportFile(fileToken, outputPath, userAccessToken); err != nil {
 			return err
 		}
 
@@ -89,5 +92,6 @@ func init() {
 	exportFileCmd.Flags().String("type", "", "导出格式（pdf/docx/xlsx，必填）")
 	exportFileCmd.Flags().String("doc-type", "docx", "文档类型")
 	exportFileCmd.Flags().StringP("output", "o", "", "输出文件路径")
+	exportFileCmd.Flags().String("user-access-token", "", "User Access Token（用于导出无 App 权限的文档）")
 	mustMarkFlagRequired(exportFileCmd, "type")
 }

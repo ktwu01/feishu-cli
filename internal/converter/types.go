@@ -97,10 +97,12 @@ type ConvertOptions struct {
 	AssetsDir           string
 	UploadImages        bool
 	DocumentID          string
-	DegradeDeepHeadings bool // 为 true 时，Heading 7-9 输出为粗体段落而非 ######
-	FrontMatter         bool // 为 true 时，导出时添加 YAML front matter
-	Highlight           bool // 为 true 时，导出文本颜色和背景色为 HTML span
-	ExpandMentions      bool // 导出时展开 @用户为友好格式（默认 false，CLI 默认 true）
+	UserAccessToken     string // User Access Token，用于下载图片和画板等需要权限的资源
+	Debug               bool   // 为 true 时，输出下载失败等调试信息到 stderr
+	DegradeDeepHeadings bool   // 为 true 时，Heading 7-9 输出为粗体段落而非 ######
+	FrontMatter         bool   // 为 true 时，导出时添加 YAML front matter
+	Highlight           bool   // 为 true 时，导出文本颜色和背景色为 HTML span
+	ExpandMentions      bool   // 导出时展开 @用户为友好格式（默认 false，CLI 默认 true）
 }
 
 // ConvertResult contains converted blocks and table data

@@ -8,7 +8,7 @@ import (
 )
 
 // CreateExportTask 创建导出任务，返回任务 ticket
-func CreateExportTask(docToken, docType, fileExtension string) (string, error) {
+func CreateExportTask(docToken, docType, fileExtension, userAccessToken string) (string, error) {
 	client, err := GetClient()
 	if err != nil {
 		return "", err
@@ -24,7 +24,7 @@ func CreateExportTask(docToken, docType, fileExtension string) (string, error) {
 		ExportTask(exportTask).
 		Build()
 
-	resp, err := client.Drive.ExportTask.Create(Context(), req)
+	resp, err := client.Drive.ExportTask.Create(Context(), req, UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return "", fmt.Errorf("创建导出任务失败: %w", err)
 	}
@@ -42,7 +42,7 @@ func CreateExportTask(docToken, docType, fileExtension string) (string, error) {
 
 // GetExportTask 查询导出任务状态，返回 jobStatus、fileToken、error
 // jobStatus: 0=成功, 1=初始化, 2=处理中
-func GetExportTask(ticket, docToken string) (int, string, error) {
+func GetExportTask(ticket, docToken, userAccessToken string) (int, string, error) {
 	client, err := GetClient()
 	if err != nil {
 		return -1, "", err
@@ -53,7 +53,7 @@ func GetExportTask(ticket, docToken string) (int, string, error) {
 		Token(docToken).
 		Build()
 
-	resp, err := client.Drive.ExportTask.Get(Context(), req)
+	resp, err := client.Drive.ExportTask.Get(Context(), req, UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return -1, "", fmt.Errorf("查询导出任务失败: %w", err)
 	}
@@ -83,7 +83,7 @@ func GetExportTask(ticket, docToken string) (int, string, error) {
 }
 
 // DownloadExportFile 下载导出任务生成的文件
-func DownloadExportFile(fileToken, outputPath string) error {
+func DownloadExportFile(fileToken, outputPath, userAccessToken string) error {
 	if err := validatePath(outputPath); err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func DownloadExportFile(fileToken, outputPath string) error {
 		FileToken(fileToken).
 		Build()
 
-	resp, err := client.Drive.ExportTask.Download(ContextWithTimeout(downloadTimeout), req)
+	resp, err := client.Drive.ExportTask.Download(ContextWithTimeout(downloadTimeout), req, UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return fmt.Errorf("下载导出文件失败: %w", err)
 	}
@@ -110,9 +110,9 @@ func DownloadExportFile(fileToken, outputPath string) error {
 }
 
 // WaitExportTask 轮询等待导出任务完成，返回导出文件的 fileToken
-func WaitExportTask(ticket, docToken string, maxRetries int) (string, error) {
+func WaitExportTask(ticket, docToken, userAccessToken string, maxRetries int) (string, error) {
 	for i := 0; i < maxRetries; i++ {
-		jobStatus, fileToken, err := GetExportTask(ticket, docToken)
+		jobStatus, fileToken, err := GetExportTask(ticket, docToken, userAccessToken)
 		if err != nil {
 			return "", err
 		}

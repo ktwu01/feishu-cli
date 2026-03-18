@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	larkcore "github.com/larksuite/oapi-sdk-go/v3/core"
 	larkdrive "github.com/larksuite/oapi-sdk-go/v3/service/drive/v1"
 )
 
@@ -78,8 +80,14 @@ func UploadMediaWithExtra(filePath, parentType, parentNode, fileName, extra stri
 	return *resp.Data.FileToken, nil
 }
 
+// DownloadMediaOptions holds optional parameters for DownloadMedia
+type DownloadMediaOptions struct {
+	UserAccessToken string // User Access Token（可选）
+	DocToken        string // 文档 Token（文档内嵌图片下载时需要）
+}
+
 // DownloadMedia downloads a file from Feishu drive
-func DownloadMedia(fileToken string, outputPath string) error {
+func DownloadMedia(fileToken string, outputPath string, opts ...DownloadMediaOptions) error {
 	if err := validatePath(outputPath); err != nil {
 		return err
 	}
@@ -89,11 +97,19 @@ func DownloadMedia(fileToken string, outputPath string) error {
 		return err
 	}
 
-	req := larkdrive.NewDownloadMediaReqBuilder().
-		FileToken(fileToken).
-		Build()
+	reqBuilder := larkdrive.NewDownloadMediaReqBuilder().
+		FileToken(fileToken)
 
-	resp, err := client.Drive.Media.Download(ContextWithTimeout(downloadTimeout), req)
+	var reqOpts []larkcore.RequestOptionFunc
+	if len(opts) > 0 {
+		reqOpts = UserTokenOption(opts[0].UserAccessToken)
+		if opts[0].DocToken != "" {
+			extraJSON, _ := json.Marshal(map[string]string{"doc_token": opts[0].DocToken, "obj_type": "docx"})
+			reqBuilder = reqBuilder.Extra(string(extraJSON))
+		}
+	}
+
+	resp, err := client.Drive.Media.Download(ContextWithTimeout(downloadTimeout), reqBuilder.Build(), reqOpts...)
 	if err != nil {
 		return fmt.Errorf("下载素材失败: %w", err)
 	}
@@ -106,17 +122,25 @@ func DownloadMedia(fileToken string, outputPath string) error {
 }
 
 // GetMediaTempURL gets a temporary download URL for a media file
-func GetMediaTempURL(fileToken string) (string, error) {
+func GetMediaTempURL(fileToken string, opts ...DownloadMediaOptions) (string, error) {
 	client, err := GetClient()
 	if err != nil {
 		return "", err
 	}
 
-	req := larkdrive.NewBatchGetTmpDownloadUrlMediaReqBuilder().
-		FileTokens([]string{fileToken}).
-		Build()
+	reqBuilder := larkdrive.NewBatchGetTmpDownloadUrlMediaReqBuilder().
+		FileTokens([]string{fileToken})
 
-	resp, err := client.Drive.Media.BatchGetTmpDownloadUrl(Context(), req)
+	var reqOpts []larkcore.RequestOptionFunc
+	if len(opts) > 0 {
+		reqOpts = UserTokenOption(opts[0].UserAccessToken)
+		if opts[0].DocToken != "" {
+			extraJSON, _ := json.Marshal(map[string]string{"doc_token": opts[0].DocToken, "obj_type": "docx"})
+			reqBuilder = reqBuilder.Extra(string(extraJSON))
+		}
+	}
+
+	resp, err := client.Drive.Media.BatchGetTmpDownloadUrl(Context(), reqBuilder.Build(), reqOpts...)
 	if err != nil {
 		return "", fmt.Errorf("获取临时下载链接失败: %w", err)
 	}

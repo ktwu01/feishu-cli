@@ -58,13 +58,16 @@ var exportMarkdownCmd = &cobra.Command{
 		expandMentions, _ := cmd.Flags().GetBool("expand-mentions")
 
 		// Convert to Markdown
+		cfg := config.Get()
 		options := converter.ConvertOptions{
-			DownloadImages: downloadImages,
-			AssetsDir:      assetsDir,
-			DocumentID:     documentID,
-			FrontMatter:    frontMatter,
-			Highlight:      highlight,
-			ExpandMentions: expandMentions,
+			DownloadImages:  downloadImages,
+			AssetsDir:       assetsDir,
+			DocumentID:      documentID,
+			UserAccessToken: userAccessToken,
+			Debug:           cfg.Debug,
+			FrontMatter:     frontMatter,
+			Highlight:       highlight,
+			ExpandMentions:  expandMentions,
 		}
 
 		var conv *converter.BlockToMarkdown

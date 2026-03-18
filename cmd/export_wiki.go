@@ -56,9 +56,12 @@ var exportWikiCmd = &cobra.Command{
 			return err
 		}
 
+		// 获取可选的 User Access Token（用于访问无 App 权限的文档）
+		userAccessToken := resolveOptionalUserTokenWithFallback(cmd)
+
 		// 1. 获取节点信息
 		fmt.Printf("正在获取节点信息: %s\n", nodeToken)
-		node, err := client.GetWikiNode(nodeToken, resolveOptionalUserToken(cmd))
+		node, err := client.GetWikiNode(nodeToken, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -72,9 +75,9 @@ var exportWikiCmd = &cobra.Command{
 			return fmt.Errorf("暂不支持导出 %s 类型的文档，目前仅支持 docx", node.ObjType)
 		}
 
-		// 3. 获取文档块
+		// 3. 获取文档块（使用 User Token，与获取节点信息保持一致）
 		fmt.Println("正在获取文档内容...")
-		blocks, err := client.GetAllBlocksWithToken(node.ObjToken, resolveOptionalUserToken(cmd))
+		blocks, err := client.GetAllBlocksWithToken(node.ObjToken, userAccessToken)
 		if err != nil {
 			return fmt.Errorf("获取块失败: %w", err)
 		}
@@ -83,10 +86,13 @@ var exportWikiCmd = &cobra.Command{
 		downloadImages, _ := cmd.Flags().GetBool("download-images")
 		assetsDir, _ := cmd.Flags().GetString("assets-dir")
 
+		cfg := config.Get()
 		options := converter.ConvertOptions{
-			DocumentID:     node.ObjToken,
-			DownloadImages: downloadImages,
-			AssetsDir:      assetsDir,
+			DocumentID:      node.ObjToken,
+			DownloadImages:  downloadImages,
+			AssetsDir:       assetsDir,
+			UserAccessToken: userAccessToken,
+			Debug:           cfg.Debug,
 		}
 
 		conv := converter.NewBlockToMarkdown(blocks, options)

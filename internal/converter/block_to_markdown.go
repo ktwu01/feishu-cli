@@ -764,17 +764,28 @@ func (c *BlockToMarkdown) convertImage(block *larkdocx.Block) (string, error) {
 
 		localPath := filepath.Join(c.options.AssetsDir, filename)
 
+		dlOpts := client.DownloadMediaOptions{
+			UserAccessToken: c.options.UserAccessToken,
+			DocToken:        c.options.DocumentID,
+		}
+
 		// 方式一：获取临时 URL 后下载
-		tmpURL, urlErr := client.GetMediaTempURL(token)
+		tmpURL, urlErr := client.GetMediaTempURL(token, dlOpts)
 		if urlErr == nil {
 			if dlErr := client.DownloadFromURL(tmpURL, localPath); dlErr == nil {
 				return fmt.Sprintf("![%s](%s)\n", alt, localPath), nil
+			} else if c.options.Debug {
+				fmt.Fprintf(os.Stderr, "[Debug] 图片下载失败 (URL方式): %v\n", dlErr)
 			}
+		} else if c.options.Debug {
+			fmt.Fprintf(os.Stderr, "[Debug] 获取图片临时URL失败: %v\n", urlErr)
 		}
 
 		// 方式二：SDK 直接下载
-		if sdkErr := client.DownloadMedia(token, localPath); sdkErr == nil {
+		if sdkErr := client.DownloadMedia(token, localPath, dlOpts); sdkErr == nil {
 			return fmt.Sprintf("![%s](%s)\n", alt, localPath), nil
+		} else if c.options.Debug {
+			fmt.Fprintf(os.Stderr, "[Debug] 图片SDK下载失败: %v\n", sdkErr)
 		}
 
 		// 全部失败，保留 token 引用（可能因权限不足）
@@ -1061,8 +1072,10 @@ func (c *BlockToMarkdown) convertBoard(block *larkdocx.Block) (string, error) {
 
 		localPath := filepath.Join(c.options.AssetsDir, filename)
 
-		if err := client.GetBoardImage(token, localPath); err == nil {
+		if err := client.GetBoardImage(token, localPath, c.options.UserAccessToken); err == nil {
 			return fmt.Sprintf("![画板](%s)\n", localPath), nil
+		} else if c.options.Debug {
+			fmt.Fprintf(os.Stderr, "[Debug] 画板下载失败: %v\n", err)
 		}
 	}
 

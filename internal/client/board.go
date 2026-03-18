@@ -13,7 +13,7 @@ import (
 )
 
 // GetBoardImage downloads whiteboard image and saves to file
-func GetBoardImage(whiteboardID string, outputPath string) error {
+func GetBoardImage(whiteboardID string, outputPath string, userAccessToken ...string) error {
 	client, err := GetClient()
 	if err != nil {
 		return err
@@ -22,7 +22,14 @@ func GetBoardImage(whiteboardID string, outputPath string) error {
 	// 使用通用 HTTP 请求方式
 	apiPath := fmt.Sprintf("/open-apis/board/v1/whiteboards/%s/download_as_image", whiteboardID)
 
-	resp, err := client.Get(Context(), apiPath, nil, larkcore.AccessTokenTypeTenant)
+	tokenType := larkcore.AccessTokenTypeTenant
+	var opts []larkcore.RequestOptionFunc
+	if len(userAccessToken) > 0 && userAccessToken[0] != "" {
+		tokenType = larkcore.AccessTokenTypeUser
+		opts = UserTokenOption(userAccessToken[0])
+	}
+
+	resp, err := client.Get(Context(), apiPath, nil, tokenType, opts...)
 	if err != nil {
 		return fmt.Errorf("获取画板图片失败: %w", err)
 	}

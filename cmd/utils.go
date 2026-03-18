@@ -33,7 +33,22 @@ func resolveOptionalUserToken(cmd *cobra.Command) string {
 func resolveOptionalUserTokenWithFallback(cmd *cobra.Command) string {
 	flagToken, _ := cmd.Flags().GetString("user-access-token")
 	cfg := config.Get()
-	token, _ := auth.ResolveUserAccessToken(flagToken, cfg.UserAccessToken, cfg.AppID, cfg.AppSecret, cfg.BaseURL)
+	token, err := auth.ResolveUserAccessToken(flagToken, cfg.UserAccessToken, cfg.AppID, cfg.AppSecret, cfg.BaseURL)
+	if err != nil {
+		if cfg.Debug {
+			fmt.Fprintf(os.Stderr, "[Debug] User Token 解析失败，回退到 App Token: %v\n", err)
+		}
+		return ""
+	}
+	if cfg.Debug {
+		source := "token.json/config"
+		if flagToken != "" {
+			source = "--user-access-token 参数"
+		} else if os.Getenv("FEISHU_USER_ACCESS_TOKEN") != "" {
+			source = "FEISHU_USER_ACCESS_TOKEN 环境变量"
+		}
+		fmt.Fprintf(os.Stderr, "[Debug] 使用 User Access Token (来源: %s)\n", source)
+	}
 	return token
 }
 
