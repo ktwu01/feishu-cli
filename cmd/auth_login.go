@@ -21,7 +21,7 @@ Authorization Code Flow（默认）:
   · 远程 SSH 环境（自动检测或 --manual）: 打印授权 URL，手动复制回调 URL 粘贴到终端。
   · 非交互模式（--print-url）: 仅输出授权 URL JSON，配合 auth callback 两步完成。
 
-Device Flow（--device，RFC 8628）:
+Device Flow（--method device，RFC 8628）:
   无需在飞书开放平台配置重定向 URL 白名单。
   终端显示用户码，用户在任意浏览器打开链接输入用户码完成授权，命令自动轮询等待结果。
 

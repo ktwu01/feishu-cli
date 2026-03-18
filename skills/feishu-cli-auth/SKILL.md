@@ -293,11 +293,11 @@ http://127.0.0.1:9768/callback
 
 如果使用自定义端口（`--port 8080`），需添加对应的重定向 URL。
 
-Device Flow（`--device`）无需此配置。
+Device Flow（`--method device`）无需此配置。
 
 ### Device Flow 说明
 
-`--device` 是 Authorization Code Flow 的平替方案，区别仅在于无需配置重定向 URL 白名单：
+`--method device` 是 Authorization Code Flow 的平替方案，区别仅在于无需配置重定向 URL 白名单：
 
 1. 执行 `feishu-cli auth login --method device`
 2. 终端显示用户码和验证链接，在浏览器中打开链接并输入用户码完成授权

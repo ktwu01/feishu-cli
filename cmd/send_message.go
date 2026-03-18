@@ -93,6 +93,39 @@ var sendMessageCmd = &cobra.Command{
 		filePath, _ := cmd.Flags().GetString("file")
 		imagePath, _ := cmd.Flags().GetString("image")
 
+		// 互斥校验：5 个内容标志只能指定一个
+		var specifiedFlags []string
+		if filePath != "" {
+			specifiedFlags = append(specifiedFlags, "--file")
+		}
+		if imagePath != "" {
+			specifiedFlags = append(specifiedFlags, "--image")
+		}
+		if contentFile != "" {
+			specifiedFlags = append(specifiedFlags, "--content-file")
+		}
+		if content != "" {
+			specifiedFlags = append(specifiedFlags, "--content")
+		}
+		if text != "" {
+			specifiedFlags = append(specifiedFlags, "--text")
+		}
+		if len(specifiedFlags) > 1 {
+			return fmt.Errorf("以下标志互斥，只能指定其中一个: %s", fmt.Sprintf("%v", specifiedFlags))
+		}
+
+		// 文件/图片路径预检查
+		if filePath != "" {
+			if _, err := os.Stat(filePath); err != nil {
+				return fmt.Errorf("指定的文件不存在: %s", filePath)
+			}
+		}
+		if imagePath != "" {
+			if _, err := os.Stat(imagePath); err != nil {
+				return fmt.Errorf("指定的图片文件不存在: %s", imagePath)
+			}
+		}
+
 		var msgContent string
 		switch {
 		case filePath != "":

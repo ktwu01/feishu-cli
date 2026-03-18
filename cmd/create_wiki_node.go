@@ -20,10 +20,14 @@ var createWikiNodeCmd = &cobra.Command{
   --obj-type      文档类型（可选，默认 docx）
   --node-type     节点类型（可选，默认 origin）
 
-节点类型:
+文档类型（--obj-type）:
   docx      新版文档（默认）
   doc       旧版文档
   sheet     电子表格
+
+节点类型（--node-type）:
+  origin    实体节点（默认）
+  shortcut  快捷方式
 
 示例:
   # 在知识空间根目录创建文档

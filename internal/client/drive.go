@@ -489,12 +489,10 @@ func DownloadFile(fileToken string, outputPath string) error {
 	return saveToFile(resp.File, outputPath)
 }
 
-// maxSingleUploadSize is the max file size for single-request upload (20MB).
-// Files larger than this must use multipart upload.
+// maxSingleUploadSize 单次上传的文件大小上限（20MB），超过此大小需使用分片上传
 const maxSingleUploadSize = 20 * 1024 * 1024
 
-// UploadFile uploads a file to Feishu Drive.
-// Automatically uses multipart upload for files larger than 20MB.
+// UploadFile 上传文件到飞书云空间，超过 20MB 自动使用分片上传
 func UploadFile(filePath, parentToken, fileName string) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -518,7 +516,7 @@ func UploadFile(filePath, parentToken, fileName string) (string, error) {
 	return uploadFileSingle(file, parentToken, fileName, fileSize)
 }
 
-// uploadFileSingle uploads a file in a single request (for files ≤ 20MB).
+// uploadFileSingle 单次上传文件（适用于 ≤ 20MB 的文件）
 func uploadFileSingle(file *os.File, parentToken, fileName string, fileSize int) (string, error) {
 	client, err := GetClient()
 	if err != nil {
@@ -551,17 +549,17 @@ func uploadFileSingle(file *os.File, parentToken, fileName string, fileSize int)
 	return *resp.Data.FileToken, nil
 }
 
-// uploadFileMultipart uploads a large file using the three-step multipart API:
-// 1. upload_prepare — get upload_id, block_size, block_num
-// 2. upload_part   — upload each block sequentially
-// 3. upload_finish — finalize and get file_token
+// uploadFileMultipart 使用三阶段分片 API 上传大文件：
+// 1. upload_prepare — 获取 upload_id、block_size、block_num
+// 2. upload_part   — 逐片上传（含重试机制）
+// 3. upload_finish — 完成上传并获取 file_token
 func uploadFileMultipart(filePath, parentToken, fileName string, fileSize int) (string, error) {
 	client, err := GetClient()
 	if err != nil {
 		return "", err
 	}
 
-	// Step 1: Prepare
+	// 第一步：准备分片上传
 	prepareReq := larkdrive.NewUploadPrepareFileReqBuilder().
 		FileUploadInfo(larkdrive.NewFileUploadInfoBuilder().
 			FileName(fileName).
@@ -590,7 +588,8 @@ func uploadFileMultipart(filePath, parentToken, fileName string, fileSize int) (
 	fmt.Printf("分片上传: 文件大小 %s, 分片大小 %s, 共 %d 个分片\n",
 		formatSize(fileSize), formatSize(blockSize), blockNum)
 
-	// Step 2: Upload parts
+	// 第二步：逐片上传（每片最多重试 3 次）
+	const maxPartRetries = 3
 	for seq := 0; seq < blockNum; seq++ {
 		offset := int64(seq) * int64(blockSize)
 		partSize := int64(blockSize)
@@ -599,37 +598,56 @@ func uploadFileMultipart(filePath, parentToken, fileName string, fileSize int) (
 			partSize = remaining
 		}
 
-		partFile, err := os.Open(filePath)
-		if err != nil {
-			return "", fmt.Errorf("打开文件失败: %w", err)
-		}
-		if _, err := partFile.Seek(offset, io.SeekStart); err != nil {
+		var lastErr error
+		uploaded := false
+		for attempt := 1; attempt <= maxPartRetries; attempt++ {
+			partFile, err := os.Open(filePath)
+			if err != nil {
+				return "", fmt.Errorf("打开文件失败: %w", err)
+			}
+			if _, err := partFile.Seek(offset, io.SeekStart); err != nil {
+				partFile.Close()
+				return "", fmt.Errorf("定位文件分片 %d 失败: %w", seq, err)
+			}
+
+			partReq := larkdrive.NewUploadPartFileReqBuilder().
+				Body(larkdrive.NewUploadPartFileReqBodyBuilder().
+					UploadId(uploadID).
+					Seq(seq).
+					Size(int(partSize)).
+					File(io.LimitReader(partFile, partSize)).
+					Build()).
+				Build()
+
+			partResp, err := client.Drive.File.UploadPart(ContextWithTimeout(downloadTimeout), partReq)
 			partFile.Close()
-			return "", fmt.Errorf("定位文件分片 %d 失败: %w", seq, err)
+
+			if err == nil && partResp.Success() {
+				uploaded = true
+				break
+			}
+
+			// 记录本次错误
+			if err != nil {
+				lastErr = fmt.Errorf("上传分片 %d/%d 失败: %w", seq+1, blockNum, err)
+			} else {
+				lastErr = fmt.Errorf("上传分片 %d/%d 失败: code=%d, msg=%s", seq+1, blockNum, partResp.Code, partResp.Msg)
+			}
+
+			if attempt < maxPartRetries {
+				fmt.Printf("  第 %d/%d 片上传失败，重试 (%d/%d)...\n", seq+1, blockNum, attempt, maxPartRetries)
+				time.Sleep(time.Duration(attempt) * time.Second)
+			}
 		}
 
-		partReq := larkdrive.NewUploadPartFileReqBuilder().
-			Body(larkdrive.NewUploadPartFileReqBodyBuilder().
-				UploadId(uploadID).
-				Seq(seq).
-				Size(int(partSize)).
-				File(io.LimitReader(partFile, partSize)).
-				Build()).
-			Build()
-
-		partResp, err := client.Drive.File.UploadPart(ContextWithTimeout(downloadTimeout), partReq)
-		partFile.Close()
-		if err != nil {
-			return "", fmt.Errorf("上传分片 %d/%d 失败: %w", seq+1, blockNum, err)
-		}
-		if !partResp.Success() {
-			return "", fmt.Errorf("上传分片 %d/%d 失败: code=%d, msg=%s", seq+1, blockNum, partResp.Code, partResp.Msg)
+		if !uploaded {
+			return "", lastErr
 		}
 
 		fmt.Printf("  分片 %d/%d 上传完成 (%s)\n", seq+1, blockNum, formatSize(int(partSize)))
 	}
 
-	// Step 3: Finish
+	// 第三步：完成上传
 	finishReq := larkdrive.NewUploadFinishFileReqBuilder().
 		Body(larkdrive.NewUploadFinishFileReqBodyBuilder().
 			UploadId(uploadID).
@@ -652,7 +670,7 @@ func uploadFileMultipart(filePath, parentToken, fileName string, fileSize int) (
 	return *finishResp.Data.FileToken, nil
 }
 
-// formatSize formats bytes into a human-readable string.
+// formatSize 将字节数格式化为可读字符串
 func formatSize(bytes int) string {
 	const (
 		KB = 1024
