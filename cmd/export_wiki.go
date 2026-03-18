@@ -74,7 +74,7 @@ var exportWikiCmd = &cobra.Command{
 
 		// 3. 获取文档块
 		fmt.Println("正在获取文档内容...")
-		blocks, err := client.GetAllBlocks(node.ObjToken)
+		blocks, err := client.GetAllBlocksWithToken(node.ObjToken, resolveOptionalUserToken(cmd))
 		if err != nil {
 			return fmt.Errorf("获取块失败: %w", err)
 		}
