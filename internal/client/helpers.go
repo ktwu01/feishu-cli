@@ -14,6 +14,14 @@ func UserTokenOption(userAccessToken string) []larkcore.RequestOptionFunc {
 	return nil
 }
 
+// resolveTokenOpts 根据是否提供 userAccessToken 选择请求使用的 token 类型和请求选项。
+func resolveTokenOpts(userAccessToken string) (larkcore.AccessTokenType, []larkcore.RequestOptionFunc) {
+	if userAccessToken != "" {
+		return larkcore.AccessTokenTypeUser, UserTokenOption(userAccessToken)
+	}
+	return larkcore.AccessTokenTypeTenant, nil
+}
+
 // StringVal 安全解引用字符串指针，nil 返回空字符串
 func StringVal(p *string) string {
 	if p == nil {

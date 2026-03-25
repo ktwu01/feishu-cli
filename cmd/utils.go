@@ -70,6 +70,27 @@ func mustMarkFlagRequired(cmd *cobra.Command, flags ...string) {
 	}
 }
 
+// loadJSONInput 统一处理 --xxx 和 --xxx-file 两种 JSON 输入方式。
+func loadJSONInput(inlineValue, filePath, inlineFlag, fileFlag, label string) (string, error) {
+	if inlineValue != "" && filePath != "" {
+		return "", fmt.Errorf("--%s 和 --%s 不能同时使用", inlineFlag, fileFlag)
+	}
+
+	if filePath != "" {
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return "", fmt.Errorf("读取 %s 文件失败: %w", label, err)
+		}
+		inlineValue = string(data)
+	}
+
+	if strings.TrimSpace(inlineValue) == "" {
+		return "", fmt.Errorf("请通过 --%s 或 --%s 提供%s", inlineFlag, fileFlag, label)
+	}
+
+	return inlineValue, nil
+}
+
 // printJSON 安全地打印 JSON 格式的数据
 // 如果序列化失败，会返回错误而不是静默忽略
 func printJSON(v any) error {

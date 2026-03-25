@@ -382,3 +382,35 @@ func TestInit_DebugFromEnv(t *testing.T) {
 		t.Errorf("Debug = %v, 期望 %v", c.Debug, true)
 	}
 }
+
+func TestInit_ConfigDefaultsExposedToViper(t *testing.T) {
+	resetConfig()
+
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.yaml")
+	if err := os.WriteFile(configFile, []byte("app_id: \"\"\napp_secret: \"\"\n"), 0600); err != nil {
+		t.Fatalf("创建配置文件失败: %v", err)
+	}
+
+	os.Unsetenv("FEISHU_OWNER_EMAIL")
+	os.Unsetenv("FEISHU_TRANSFER_OWNERSHIP")
+
+	if err := Init(configFile); err != nil {
+		t.Fatalf("Init() 返回错误: %v", err)
+	}
+
+	if !viper.IsSet("owner_email") {
+		t.Fatal("owner_email 应被识别为已设置默认值")
+	}
+	if !viper.IsSet("transfer_ownership") {
+		t.Fatal("transfer_ownership 应被识别为已设置默认值")
+	}
+
+	c := Get()
+	if c.OwnerEmail != "" {
+		t.Errorf("OwnerEmail = %q, 期望空字符串", c.OwnerEmail)
+	}
+	if c.TransferOwnership {
+		t.Errorf("TransferOwnership = %v, 期望 false", c.TransferOwnership)
+	}
+}

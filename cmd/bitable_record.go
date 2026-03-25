@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/riba2534/feishu-cli/internal/client"
@@ -146,15 +145,12 @@ var bitableAddRecordCmd = &cobra.Command{
 		output, _ := cmd.Flags().GetString("output")
 		userToken := resolveOptionalUserToken(cmd)
 
-		var fields map[string]any
-		if fieldsFile != "" {
-			data, err := os.ReadFile(fieldsFile)
-			if err != nil {
-				return fmt.Errorf("读取字段值文件失败: %w", err)
-			}
-			fieldsJSON = string(data)
+		fieldsJSON, err := loadJSONInput(fieldsJSON, fieldsFile, "fields", "fields-file", "字段值 JSON")
+		if err != nil {
+			return err
 		}
 
+		var fields map[string]any
 		if err := json.Unmarshal([]byte(fieldsJSON), &fields); err != nil {
 			return fmt.Errorf("解析字段值 JSON 失败: %w", err)
 		}
@@ -189,12 +185,9 @@ var bitableAddRecordsCmd = &cobra.Command{
 		output, _ := cmd.Flags().GetString("output")
 		userToken := resolveOptionalUserToken(cmd)
 
-		if dataFile != "" {
-			data, err := os.ReadFile(dataFile)
-			if err != nil {
-				return fmt.Errorf("读取数据文件失败: %w", err)
-			}
-			dataJSON = string(data)
+		dataJSON, err := loadJSONInput(dataJSON, dataFile, "data", "data-file", "记录数据 JSON")
+		if err != nil {
+			return err
 		}
 
 		var records []map[string]any
@@ -233,15 +226,12 @@ var bitableUpdateRecordCmd = &cobra.Command{
 		output, _ := cmd.Flags().GetString("output")
 		userToken := resolveOptionalUserToken(cmd)
 
-		var fields map[string]any
-		if fieldsFile != "" {
-			data, err := os.ReadFile(fieldsFile)
-			if err != nil {
-				return fmt.Errorf("读取字段值文件失败: %w", err)
-			}
-			fieldsJSON = string(data)
+		fieldsJSON, err := loadJSONInput(fieldsJSON, fieldsFile, "fields", "fields-file", "字段值 JSON")
+		if err != nil {
+			return err
 		}
 
+		var fields map[string]any
 		if err := json.Unmarshal([]byte(fieldsJSON), &fields); err != nil {
 			return fmt.Errorf("解析字段值 JSON 失败: %w", err)
 		}
@@ -256,6 +246,49 @@ var bitableUpdateRecordCmd = &cobra.Command{
 		}
 
 		fmt.Printf("更新成功！Record ID: %s\n", record.RecordID)
+		return nil
+	},
+}
+
+var bitableUpdateRecordsCmd = &cobra.Command{
+	Use:   "update-records <app_token> <table_id>",
+	Short: "批量更新记录",
+	Long: `批量更新记录（最多 500 条）。
+
+数据格式为 JSON 数组，每个元素需包含 record_id 和 fields:
+  [{"record_id":"recxxx","fields":{"状态":"已完成"}},{"record_id":"recyyy","fields":{"金额":300}}]`,
+	Args: cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		appToken := args[0]
+		tableID := args[1]
+		dataJSON, _ := cmd.Flags().GetString("data")
+		dataFile, _ := cmd.Flags().GetString("data-file")
+		output, _ := cmd.Flags().GetString("output")
+		userToken := resolveOptionalUserToken(cmd)
+
+		dataJSON, err := loadJSONInput(dataJSON, dataFile, "data", "data-file", "记录数据 JSON")
+		if err != nil {
+			return err
+		}
+
+		var records []map[string]any
+		if err := json.Unmarshal([]byte(dataJSON), &records); err != nil {
+			return fmt.Errorf("解析数据 JSON 失败: %w", err)
+		}
+
+		results, err := client.BatchUpdateBitableRecords(appToken, tableID, records, userToken)
+		if err != nil {
+			return err
+		}
+
+		if output == "json" {
+			return printJSON(results)
+		}
+
+		fmt.Printf("批量更新成功！共 %d 条记录\n", len(results))
+		for _, r := range results {
+			fmt.Printf("  Record ID: %s\n", r.RecordID)
+		}
 		return nil
 	},
 }
@@ -293,6 +326,7 @@ func init() {
 	bitableCmd.AddCommand(bitableAddRecordCmd)
 	bitableCmd.AddCommand(bitableAddRecordsCmd)
 	bitableCmd.AddCommand(bitableUpdateRecordCmd)
+	bitableCmd.AddCommand(bitableUpdateRecordsCmd)
 	bitableCmd.AddCommand(bitableDeleteRecordsCmd)
 
 	// records (search)
@@ -313,18 +347,32 @@ func init() {
 	bitableAddRecordCmd.Flags().String("fields-file", "", "字段值 JSON 文件")
 	bitableAddRecordCmd.Flags().StringP("output", "o", "text", "输出格式: text, json")
 	bitableAddRecordCmd.Flags().String("user-access-token", "", "User Access Token（可选）")
+	bitableAddRecordCmd.MarkFlagsOneRequired("fields", "fields-file")
+	bitableAddRecordCmd.MarkFlagsMutuallyExclusive("fields", "fields-file")
 
 	// add-records
 	bitableAddRecordsCmd.Flags().String("data", "", "记录数据 JSON 数组")
 	bitableAddRecordsCmd.Flags().String("data-file", "", "记录数据 JSON 文件")
 	bitableAddRecordsCmd.Flags().StringP("output", "o", "text", "输出格式: text, json")
 	bitableAddRecordsCmd.Flags().String("user-access-token", "", "User Access Token（可选）")
+	bitableAddRecordsCmd.MarkFlagsOneRequired("data", "data-file")
+	bitableAddRecordsCmd.MarkFlagsMutuallyExclusive("data", "data-file")
 
 	// update-record
 	bitableUpdateRecordCmd.Flags().String("fields", "", "字段值 JSON")
 	bitableUpdateRecordCmd.Flags().String("fields-file", "", "字段值 JSON 文件")
 	bitableUpdateRecordCmd.Flags().StringP("output", "o", "text", "输出格式: text, json")
 	bitableUpdateRecordCmd.Flags().String("user-access-token", "", "User Access Token（可选）")
+	bitableUpdateRecordCmd.MarkFlagsOneRequired("fields", "fields-file")
+	bitableUpdateRecordCmd.MarkFlagsMutuallyExclusive("fields", "fields-file")
+
+	// update-records
+	bitableUpdateRecordsCmd.Flags().String("data", "", "记录数据 JSON 数组")
+	bitableUpdateRecordsCmd.Flags().String("data-file", "", "记录数据 JSON 文件")
+	bitableUpdateRecordsCmd.Flags().StringP("output", "o", "text", "输出格式: text, json")
+	bitableUpdateRecordsCmd.Flags().String("user-access-token", "", "User Access Token（可选）")
+	bitableUpdateRecordsCmd.MarkFlagsOneRequired("data", "data-file")
+	bitableUpdateRecordsCmd.MarkFlagsMutuallyExclusive("data", "data-file")
 
 	// delete-records
 	bitableDeleteRecordsCmd.Flags().String("record-ids", "", "记录 ID 列表（逗号分隔）")

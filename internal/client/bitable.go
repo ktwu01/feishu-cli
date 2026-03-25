@@ -29,13 +29,13 @@ type BitableTable struct {
 
 // BitableField 字段信息
 type BitableField struct {
-	FieldID     string              `json:"field_id"`
-	FieldName   string              `json:"field_name"`
-	Type        int                 `json:"type"`
-	UIType      string              `json:"ui_type,omitempty"`
-	IsPrimary   bool                `json:"is_primary,omitempty"`
-	Description *BitableFieldDesc   `json:"description,omitempty"`
-	Property    json.RawMessage     `json:"property,omitempty"`
+	FieldID     string            `json:"field_id"`
+	FieldName   string            `json:"field_name"`
+	Type        int               `json:"type"`
+	UIType      string            `json:"ui_type,omitempty"`
+	IsPrimary   bool              `json:"is_primary,omitempty"`
+	Description *BitableFieldDesc `json:"description,omitempty"`
+	Property    json.RawMessage   `json:"property,omitempty"`
 }
 
 // BitableFieldDesc 字段描述，兼容字符串和对象两种 API 返回格式
@@ -82,17 +82,17 @@ type BitableView struct {
 
 // BitableSearchOptions 记录搜索选项
 type BitableSearchOptions struct {
-	PageSize  int              `json:"page_size,omitempty"`
-	PageToken string           `json:"page_token,omitempty"`
-	Filter    *BitableFilter   `json:"filter,omitempty"`
-	Sort      []BitableSortItem `json:"sort,omitempty"`
-	FieldNames []string        `json:"field_names,omitempty"`
+	PageSize   int               `json:"page_size,omitempty"`
+	PageToken  string            `json:"page_token,omitempty"`
+	Filter     *BitableFilter    `json:"filter,omitempty"`
+	Sort       []BitableSortItem `json:"sort,omitempty"`
+	FieldNames []string          `json:"field_names,omitempty"`
 }
 
 // BitableFilter 过滤条件
 type BitableFilter struct {
-	Conjunction string              `json:"conjunction"` // and / or
-	Conditions  []BitableCondition  `json:"conditions"`
+	Conjunction string             `json:"conjunction"` // and / or
+	Conditions  []BitableCondition `json:"conditions"`
 }
 
 // BitableCondition 过滤条件项
@@ -126,12 +126,7 @@ func CreateBitableApp(name string, folderToken string, userAccessToken string) (
 		reqBody["folder_token"] = folderToken
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := bitableBase + "/apps"
 	resp, err := client.Post(Context(), apiPath, reqBody, tokenType, opts...)
@@ -149,12 +144,7 @@ func GetBitableApp(appToken string, userAccessToken string) (*BitableApp, error)
 		return nil, err
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s", bitableBase, appToken)
 	resp, err := client.Get(Context(), apiPath, nil, tokenType, opts...)
@@ -169,25 +159,8 @@ func GetBitableApp(appToken string, userAccessToken string) (*BitableApp, error)
 
 // ListBitableTables 列出数据表
 func ListBitableTables(appToken string, userAccessToken string) ([]BitableTable, error) {
-	client, err := GetClient()
-	if err != nil {
-		return nil, err
-	}
-
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
-
 	apiPath := fmt.Sprintf("%s/apps/%s/tables", bitableBase, appToken)
-	resp, err := client.Get(Context(), apiPath, nil, tokenType, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("列出数据表失败: %w", err)
-	}
-
-	return parseBitableListResponse[BitableTable](resp, "列出数据表", "items")
+	return fetchAllBitableItems[BitableTable](apiPath, "列出数据表", userAccessToken)
 }
 
 // CreateBitableTable 创建数据表
@@ -203,12 +176,7 @@ func CreateBitableTable(appToken string, name string, userAccessToken string) (*
 		},
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables", bitableBase, appToken)
 	resp, err := client.Post(Context(), apiPath, reqBody, tokenType, opts...)
@@ -226,12 +194,7 @@ func DeleteBitableTable(appToken string, tableID string, userAccessToken string)
 		return err
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s", bitableBase, appToken, tableID)
 	resp, err := client.Delete(Context(), apiPath, nil, tokenType, opts...)
@@ -253,12 +216,7 @@ func RenameBitableTable(appToken string, tableID string, name string, userAccess
 		"name": name,
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s", bitableBase, appToken, tableID)
 	resp, err := client.Patch(Context(), apiPath, reqBody, tokenType, opts...)
@@ -273,25 +231,8 @@ func RenameBitableTable(appToken string, tableID string, name string, userAccess
 
 // ListBitableFields 列出字段
 func ListBitableFields(appToken string, tableID string, userAccessToken string) ([]BitableField, error) {
-	client, err := GetClient()
-	if err != nil {
-		return nil, err
-	}
-
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
-
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/fields", bitableBase, appToken, tableID)
-	resp, err := client.Get(Context(), apiPath, nil, tokenType, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("列出字段失败: %w", err)
-	}
-
-	return parseBitableListResponse[BitableField](resp, "列出字段", "items")
+	return fetchAllBitableItems[BitableField](apiPath, "列出字段", userAccessToken)
 }
 
 // CreateBitableField 创建字段
@@ -301,12 +242,7 @@ func CreateBitableField(appToken string, tableID string, fieldDef map[string]any
 		return nil, err
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/fields", bitableBase, appToken, tableID)
 	resp, err := client.Post(Context(), apiPath, fieldDef, tokenType, opts...)
@@ -324,12 +260,7 @@ func UpdateBitableField(appToken string, tableID string, fieldID string, fieldDe
 		return nil, err
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/fields/%s", bitableBase, appToken, tableID, fieldID)
 	resp, err := client.Put(Context(), apiPath, fieldDef, tokenType, opts...)
@@ -347,12 +278,7 @@ func DeleteBitableField(appToken string, tableID string, fieldID string, userAcc
 		return err
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/fields/%s", bitableBase, appToken, tableID, fieldID)
 	resp, err := client.Delete(Context(), apiPath, nil, tokenType, opts...)
@@ -376,12 +302,7 @@ func CreateBitableRecord(appToken string, tableID string, fields map[string]any,
 		"fields": fields,
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/records", bitableBase, appToken, tableID)
 	resp, err := client.Post(Context(), apiPath, reqBody, tokenType, opts...)
@@ -408,12 +329,7 @@ func BatchCreateBitableRecords(appToken string, tableID string, records []map[st
 		"records": items,
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/records/batch_create", bitableBase, appToken, tableID)
 	resp, err := client.Post(Context(), apiPath, reqBody, tokenType, opts...)
@@ -435,12 +351,7 @@ func UpdateBitableRecord(appToken string, tableID string, recordID string, field
 		"fields": fields,
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/records/%s", bitableBase, appToken, tableID, recordID)
 	resp, err := client.Put(Context(), apiPath, reqBody, tokenType, opts...)
@@ -462,12 +373,7 @@ func BatchUpdateBitableRecords(appToken string, tableID string, records []map[st
 		"records": records,
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/records/batch_update", bitableBase, appToken, tableID)
 	resp, err := client.Post(Context(), apiPath, reqBody, tokenType, opts...)
@@ -489,12 +395,7 @@ func BatchDeleteBitableRecords(appToken string, tableID string, recordIDs []stri
 		"records": recordIDs,
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/records/batch_delete", bitableBase, appToken, tableID)
 	resp, err := client.Post(Context(), apiPath, reqBody, tokenType, opts...)
@@ -529,12 +430,7 @@ func SearchBitableRecords(appToken string, tableID string, opts BitableSearchOpt
 		reqBody["field_names"] = opts.FieldNames
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var reqOpts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		reqOpts = UserTokenOption(userAccessToken)
-	}
+	tokenType, reqOpts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/records/search", bitableBase, appToken, tableID)
 	resp, err := client.Post(Context(), apiPath, reqBody, tokenType, reqOpts...)
@@ -580,12 +476,7 @@ func GetBitableRecord(appToken string, tableID string, recordID string, userAcce
 		return nil, err
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/records/%s", bitableBase, appToken, tableID, recordID)
 	resp, err := client.Get(Context(), apiPath, nil, tokenType, opts...)
@@ -605,59 +496,20 @@ func ListBitableViews(appToken string, tableID string, pageSize int, pageToken s
 		return nil, "", err
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
-	params := url.Values{}
-	if pageSize > 0 {
-		params.Set("page_size", strconv.Itoa(pageSize))
-	}
-	if pageToken != "" {
-		params.Set("page_token", pageToken)
-	}
-
-	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/views", bitableBase, appToken, tableID)
-	if len(params) > 0 {
-		apiPath += "?" + params.Encode()
-	}
+	apiPath := buildBitablePagePath(
+		fmt.Sprintf("%s/apps/%s/tables/%s/views", bitableBase, appToken, tableID),
+		pageSize,
+		pageToken,
+	)
 
 	resp, err := client.Get(Context(), apiPath, nil, tokenType, opts...)
 	if err != nil {
 		return nil, "", fmt.Errorf("列出视图失败: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("列出视图失败: HTTP %d, body: %s", resp.StatusCode, string(resp.RawBody))
-	}
-
-	var apiResp struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
-		Data struct {
-			Items     []BitableView `json:"items"`
-			PageToken string        `json:"page_token"`
-			HasMore   bool          `json:"has_more"`
-		} `json:"data"`
-	}
-
-	if err := json.Unmarshal(resp.RawBody, &apiResp); err != nil {
-		return nil, "", fmt.Errorf("解析响应失败: %w", err)
-	}
-
-	if apiResp.Code != 0 {
-		return nil, "", fmt.Errorf("列出视图失败: code=%d, msg=%s", apiResp.Code, apiResp.Msg)
-	}
-
-	nextPageToken := ""
-	if apiResp.Data.HasMore {
-		nextPageToken = apiResp.Data.PageToken
-	}
-
-	return apiResp.Data.Items, nextPageToken, nil
+	return parseBitablePagedListResponse[BitableView](resp, "列出视图")
 }
 
 // CreateBitableView 创建视图
@@ -672,12 +524,7 @@ func CreateBitableView(appToken string, tableID string, viewName string, viewTyp
 		"view_type": viewType,
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/views", bitableBase, appToken, tableID)
 	resp, err := client.Post(Context(), apiPath, reqBody, tokenType, opts...)
@@ -715,12 +562,7 @@ func DeleteBitableView(appToken string, tableID string, viewID string, userAcces
 		return err
 	}
 
-	tokenType := larkcore.AccessTokenTypeTenant
-	var opts []larkcore.RequestOptionFunc
-	if userAccessToken != "" {
-		tokenType = larkcore.AccessTokenTypeUser
-		opts = UserTokenOption(userAccessToken)
-	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
 
 	apiPath := fmt.Sprintf("%s/apps/%s/tables/%s/views/%s", bitableBase, appToken, tableID, viewID)
 	resp, err := client.Delete(Context(), apiPath, nil, tokenType, opts...)
@@ -753,6 +595,52 @@ func checkBitableError(resp *larkcore.ApiResp, action string) error {
 	}
 
 	return nil
+}
+
+// fetchAllBitableItems 自动翻页获取全部列表数据，避免 tables/fields 结果被截断。
+func fetchAllBitableItems[T any](basePath string, action string, userAccessToken string) ([]T, error) {
+	client, err := GetClient()
+	if err != nil {
+		return nil, err
+	}
+
+	tokenType, reqOpts := resolveTokenOpts(userAccessToken)
+	var allItems []T
+	nextPageToken := ""
+
+	for {
+		apiPath := buildBitablePagePath(basePath, 0, nextPageToken)
+		resp, err := client.Get(Context(), apiPath, nil, tokenType, reqOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("%s失败: %w", action, err)
+		}
+
+		items, token, err := parseBitablePagedListResponse[T](resp, action)
+		if err != nil {
+			return nil, err
+		}
+
+		allItems = append(allItems, items...)
+		if token == "" {
+			return allItems, nil
+		}
+
+		nextPageToken = token
+	}
+}
+
+func buildBitablePagePath(basePath string, pageSize int, pageToken string) string {
+	params := url.Values{}
+	if pageSize > 0 {
+		params.Set("page_size", strconv.Itoa(pageSize))
+	}
+	if pageToken != "" {
+		params.Set("page_token", pageToken)
+	}
+	if len(params) == 0 {
+		return basePath
+	}
+	return basePath + "?" + params.Encode()
 }
 
 // parseBitableResponse 解析 Bitable API 响应（data 直接是对象）
@@ -799,43 +687,36 @@ func parseBitableResponse[T any](resp *larkcore.ApiResp, action string) (*T, err
 	return &directResp.Data, nil
 }
 
-// parseBitableListResponse 解析 Bitable API 列表响应
-func parseBitableListResponse[T any](resp *larkcore.ApiResp, action string, key string) ([]T, error) {
+// parseBitablePagedListResponse 解析带分页信息的 Bitable API 列表响应。
+func parseBitablePagedListResponse[T any](resp *larkcore.ApiResp, action string) ([]T, string, error) {
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s失败: HTTP %d, body: %s", action, resp.StatusCode, string(resp.RawBody))
+		return nil, "", fmt.Errorf("%s失败: HTTP %d, body: %s", action, resp.StatusCode, string(resp.RawBody))
 	}
 
 	var apiResp struct {
-		Code int             `json:"code"`
-		Msg  string          `json:"msg"`
-		Data json.RawMessage `json:"data"`
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		Data struct {
+			Items     []T    `json:"items"`
+			PageToken string `json:"page_token"`
+			HasMore   bool   `json:"has_more"`
+		} `json:"data"`
 	}
 
 	if err := json.Unmarshal(resp.RawBody, &apiResp); err != nil {
-		return nil, fmt.Errorf("解析响应失败: %w", err)
+		return nil, "", fmt.Errorf("解析响应失败: %w", err)
 	}
 
 	if apiResp.Code != 0 {
-		return nil, fmt.Errorf("%s失败: code=%d, msg=%s", action, apiResp.Code, apiResp.Msg)
+		return nil, "", fmt.Errorf("%s失败: code=%d, msg=%s", action, apiResp.Code, apiResp.Msg)
 	}
 
-	// 从 data 中提取 items
-	var dataMap map[string]json.RawMessage
-	if err := json.Unmarshal(apiResp.Data, &dataMap); err != nil {
-		return nil, fmt.Errorf("解析响应数据失败: %w", err)
+	nextPageToken := ""
+	if apiResp.Data.HasMore {
+		nextPageToken = apiResp.Data.PageToken
 	}
 
-	itemsRaw, ok := dataMap[key]
-	if !ok {
-		return []T{}, nil
-	}
-
-	var items []T
-	if err := json.Unmarshal(itemsRaw, &items); err != nil {
-		return nil, fmt.Errorf("解析列表数据失败: %w", err)
-	}
-
-	return items, nil
+	return apiResp.Data.Items, nextPageToken, nil
 }
 
 // parseBitableFieldResponse 解析字段响应

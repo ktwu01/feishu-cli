@@ -26,6 +26,7 @@ var bitableCmd = &cobra.Command{
   add-record    创建记录
   add-records   批量创建记录
   update-record 更新记录
+  update-records 批量更新记录
   delete-records 批量删除记录
   views         列出视图
   create-view   创建视图

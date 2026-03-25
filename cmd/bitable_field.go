@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/riba2534/feishu-cli/internal/client"
 	"github.com/spf13/cobra"
@@ -11,19 +10,19 @@ import (
 
 // 字段类型映射
 var fieldTypeNames = map[int]string{
-	1:  "多行文本",
-	2:  "数字",
-	3:  "单选",
-	4:  "多选",
-	5:  "日期",
-	7:  "复选框",
-	11: "人员",
-	15: "超链接",
-	18: "单向关联",
-	20: "公式",
-	21: "双向关联",
-	22: "地理位置",
-	23: "群组",
+	1:    "多行文本",
+	2:    "数字",
+	3:    "单选",
+	4:    "多选",
+	5:    "日期",
+	7:    "复选框",
+	11:   "人员",
+	15:   "超链接",
+	18:   "单向关联",
+	20:   "公式",
+	21:   "双向关联",
+	22:   "地理位置",
+	23:   "群组",
 	1001: "创建时间",
 	1002: "修改时间",
 	1003: "创建人",
@@ -92,15 +91,12 @@ var bitableCreateFieldCmd = &cobra.Command{
 		output, _ := cmd.Flags().GetString("output")
 		userToken := resolveOptionalUserToken(cmd)
 
-		var fieldDef map[string]any
-		if fieldFile != "" {
-			data, err := os.ReadFile(fieldFile)
-			if err != nil {
-				return fmt.Errorf("读取字段定义文件失败: %w", err)
-			}
-			fieldJSON = string(data)
+		fieldJSON, err := loadJSONInput(fieldJSON, fieldFile, "field", "field-file", "字段定义 JSON")
+		if err != nil {
+			return err
 		}
 
+		var fieldDef map[string]any
 		if err := json.Unmarshal([]byte(fieldJSON), &fieldDef); err != nil {
 			return fmt.Errorf("解析字段定义 JSON 失败: %w", err)
 		}
@@ -141,15 +137,12 @@ var bitableUpdateFieldCmd = &cobra.Command{
 		output, _ := cmd.Flags().GetString("output")
 		userToken := resolveOptionalUserToken(cmd)
 
-		var fieldDef map[string]any
-		if fieldFile != "" {
-			data, err := os.ReadFile(fieldFile)
-			if err != nil {
-				return fmt.Errorf("读取字段定义文件失败: %w", err)
-			}
-			fieldJSON = string(data)
+		fieldJSON, err := loadJSONInput(fieldJSON, fieldFile, "field", "field-file", "字段定义 JSON")
+		if err != nil {
+			return err
 		}
 
+		var fieldDef map[string]any
 		if err := json.Unmarshal([]byte(fieldJSON), &fieldDef); err != nil {
 			return fmt.Errorf("解析字段定义 JSON 失败: %w", err)
 		}
@@ -205,12 +198,16 @@ func init() {
 	bitableCreateFieldCmd.Flags().String("field-file", "", "字段定义 JSON 文件")
 	bitableCreateFieldCmd.Flags().StringP("output", "o", "text", "输出格式: text, json")
 	bitableCreateFieldCmd.Flags().String("user-access-token", "", "User Access Token（可选）")
+	bitableCreateFieldCmd.MarkFlagsOneRequired("field", "field-file")
+	bitableCreateFieldCmd.MarkFlagsMutuallyExclusive("field", "field-file")
 
 	// update-field
 	bitableUpdateFieldCmd.Flags().String("field", "", "字段定义 JSON")
 	bitableUpdateFieldCmd.Flags().String("field-file", "", "字段定义 JSON 文件")
 	bitableUpdateFieldCmd.Flags().StringP("output", "o", "text", "输出格式: text, json")
 	bitableUpdateFieldCmd.Flags().String("user-access-token", "", "User Access Token（可选）")
+	bitableUpdateFieldCmd.MarkFlagsOneRequired("field", "field-file")
+	bitableUpdateFieldCmd.MarkFlagsMutuallyExclusive("field", "field-file")
 
 	// delete-field
 	bitableDeleteFieldCmd.Flags().String("user-access-token", "", "User Access Token（可选）")

@@ -10,15 +10,15 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	AppID           string       `mapstructure:"app_id"`
-	AppSecret       string       `mapstructure:"app_secret"`
-	UserAccessToken string       `mapstructure:"user_access_token"`
-	BaseURL         string       `mapstructure:"base_url"`
+	AppID             string       `mapstructure:"app_id"`
+	AppSecret         string       `mapstructure:"app_secret"`
+	UserAccessToken   string       `mapstructure:"user_access_token"`
+	BaseURL           string       `mapstructure:"base_url"`
 	OwnerEmail        string       `mapstructure:"owner_email"`
 	TransferOwnership bool         `mapstructure:"transfer_ownership"`
 	Debug             bool         `mapstructure:"debug"`
-	Export          ExportConfig `mapstructure:"export"`
-	Import          ImportConfig `mapstructure:"import"`
+	Export            ExportConfig `mapstructure:"export"`
+	Import            ImportConfig `mapstructure:"import"`
 }
 
 // ExportConfig holds export-related configuration
@@ -55,6 +55,8 @@ func Init(cfgFile string) error {
 
 	// 2. 设置默认值
 	viper.SetDefault("base_url", "https://open.feishu.cn")
+	viper.SetDefault("owner_email", "")
+	viper.SetDefault("transfer_ownership", false)
 	viper.SetDefault("debug", false)
 	viper.SetDefault("export.download_images", false)
 	viper.SetDefault("export.assets_dir", "./assets")
@@ -92,7 +94,9 @@ func Init(cfgFile string) error {
 func Get() *Config {
 	if cfg == nil {
 		return &Config{
-			BaseURL: "https://open.feishu.cn",
+			BaseURL:           "https://open.feishu.cn",
+			OwnerEmail:        "",
+			TransferOwnership: false,
 			Export: ExportConfig{
 				AssetsDir: "./assets",
 			},

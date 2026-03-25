@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -377,5 +378,51 @@ func TestValidateOutputPath_WithAllowedDir(t *testing.T) {
 				t.Errorf("validateOutputPath(%q, %q) 应返回错误", tt.outputPath, tt.allowedDir)
 			}
 		})
+	}
+}
+
+func TestLoadJSONInput_Inline(t *testing.T) {
+	input, err := loadJSONInput(`{"name":"test"}`, "", "data", "data-file", "记录数据 JSON")
+	if err != nil {
+		t.Fatalf("loadJSONInput() 返回错误: %v", err)
+	}
+	if input != `{"name":"test"}` {
+		t.Errorf("loadJSONInput() = %q, 期望 %q", input, `{"name":"test"}`)
+	}
+}
+
+func TestLoadJSONInput_File(t *testing.T) {
+	tmpDir := t.TempDir()
+	jsonFile := filepath.Join(tmpDir, "record.json")
+	if err := os.WriteFile(jsonFile, []byte(`{"name":"from-file"}`), 0600); err != nil {
+		t.Fatalf("写入测试文件失败: %v", err)
+	}
+
+	input, err := loadJSONInput("", jsonFile, "data", "data-file", "记录数据 JSON")
+	if err != nil {
+		t.Fatalf("loadJSONInput() 返回错误: %v", err)
+	}
+	if input != `{"name":"from-file"}` {
+		t.Errorf("loadJSONInput() = %q, 期望 %q", input, `{"name":"from-file"}`)
+	}
+}
+
+func TestLoadJSONInput_Missing(t *testing.T) {
+	_, err := loadJSONInput("", "", "fields", "fields-file", "字段值 JSON")
+	if err == nil {
+		t.Fatal("loadJSONInput() 应返回错误")
+	}
+	if !strings.Contains(err.Error(), "--fields 或 --fields-file") {
+		t.Errorf("错误信息 = %q, 未包含预期提示", err.Error())
+	}
+}
+
+func TestLoadJSONInput_BothSet(t *testing.T) {
+	_, err := loadJSONInput(`{"name":"inline"}`, "/tmp/data.json", "data", "data-file", "记录数据 JSON")
+	if err == nil {
+		t.Fatal("loadJSONInput() 应返回错误")
+	}
+	if !strings.Contains(err.Error(), "不能同时使用") {
+		t.Errorf("错误信息 = %q, 未包含预期提示", err.Error())
 	}
 }

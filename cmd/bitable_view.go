@@ -10,21 +10,30 @@ import (
 var bitableViewsCmd = &cobra.Command{
 	Use:   "views <app_token> <table_id>",
 	Short: "列出视图",
-	Long:  "列出数据表的所有视图",
+	Long:  "列出数据表的视图，支持分页参数",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		appToken := args[0]
 		tableID := args[1]
 		output, _ := cmd.Flags().GetString("output")
+		pageSize, _ := cmd.Flags().GetInt("page-size")
+		pageToken, _ := cmd.Flags().GetString("page-token")
 		userToken := resolveOptionalUserToken(cmd)
 
-		views, _, err := client.ListBitableViews(appToken, tableID, 0, "", userToken)
+		views, nextPageToken, err := client.ListBitableViews(appToken, tableID, pageSize, pageToken, userToken)
 		if err != nil {
 			return err
 		}
 
 		if output == "json" {
-			return printJSON(views)
+			result := map[string]any{
+				"views": views,
+			}
+			if nextPageToken != "" {
+				result["page_token"] = nextPageToken
+				result["has_more"] = true
+			}
+			return printJSON(result)
 		}
 
 		if len(views) == 0 {
@@ -32,7 +41,11 @@ var bitableViewsCmd = &cobra.Command{
 			return nil
 		}
 
-		fmt.Printf("共 %d 个视图：\n", len(views))
+		fmt.Printf("当前返回 %d 个视图", len(views))
+		if nextPageToken != "" {
+			fmt.Printf("（还有更多，page_token: %s）", nextPageToken)
+		}
+		fmt.Println("：")
 		for i, v := range views {
 			fmt.Printf("  %d. %s (类型: %s, ID: %s)\n", i+1, v.ViewName, v.ViewType, v.ViewID)
 		}
@@ -104,6 +117,8 @@ func init() {
 
 	// views
 	bitableViewsCmd.Flags().StringP("output", "o", "text", "输出格式: text, json")
+	bitableViewsCmd.Flags().Int("page-size", 20, "每页视图数")
+	bitableViewsCmd.Flags().String("page-token", "", "分页标记")
 	bitableViewsCmd.Flags().String("user-access-token", "", "User Access Token（可选）")
 
 	// create-view
