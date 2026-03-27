@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -94,11 +95,14 @@ func loadJSONInput(inlineValue, filePath, inlineFlag, fileFlag, label string) (s
 // printJSON 安全地打印 JSON 格式的数据
 // 如果序列化失败，会返回错误而不是静默忽略
 func printJSON(v any) error {
-	data, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(v); err != nil {
 		return fmt.Errorf("JSON 序列化失败: %w", err)
 	}
-	fmt.Println(string(data))
+	fmt.Print(buf.String())
 	return nil
 }
 
