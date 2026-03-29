@@ -42,6 +42,12 @@ func TestInit_WithEnvVariables(t *testing.T) {
 func TestInit_DefaultValues(t *testing.T) {
 	resetConfig()
 
+	// 隔离本地配置文件：临时替换 HOME，避免读到 ~/.feishu-cli/config.yaml
+	tmpDir := t.TempDir()
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", originalHome)
+
 	// 清除可能存在的环境变量
 	os.Unsetenv("FEISHU_APP_ID")
 	os.Unsetenv("FEISHU_APP_SECRET")
