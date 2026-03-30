@@ -128,6 +128,53 @@ func TestConvert_UnorderedList(t *testing.T) {
 	}
 }
 
+func TestConvert_ListItemWithCodeBlock(t *testing.T) {
+	markdown := "- **消息**：\n  ```\n  这是列表内的代码块\n  第二行\n  ```"
+
+	converter := NewMarkdownToBlock([]byte(markdown), ConvertOptions{}, "")
+	blocks, err := converter.Convert()
+
+	if err != nil {
+		t.Fatalf("Convert() 返回错误: %v", err)
+	}
+
+	if len(blocks) == 0 {
+		t.Fatal("blocks 为空")
+	}
+
+	// First block should be a bullet list item
+	if blocks[0].BlockType == nil || *blocks[0].BlockType != int(BlockTypeBullet) {
+		t.Errorf("blocks[0].BlockType = %v, 期望 %d (Bullet)", blocks[0].BlockType, int(BlockTypeBullet))
+	}
+
+	// Should have a code block as child
+	if len(blocks) < 2 {
+		t.Fatal("期望列表项后有代码块子节点，但 blocks 数量不足")
+	}
+
+	found := false
+	for _, b := range blocks {
+		if b.BlockType != nil && *b.BlockType == int(BlockTypeCode) {
+			found = true
+			// Verify code content
+			if b.Code != nil && b.Code.Elements != nil {
+				content := ""
+				for _, elem := range b.Code.Elements {
+					if elem.TextRun != nil && elem.TextRun.Content != nil {
+						content += *elem.TextRun.Content
+					}
+				}
+				if !strings.Contains(content, "这是列表内的代码块") {
+					t.Errorf("代码块内容 = %q, 期望包含 '这是列表内的代码块'", content)
+				}
+			}
+		}
+	}
+	if !found {
+		t.Error("未找到代码块，列表项内的代码块被丢弃了")
+	}
+}
+
 func TestConvert_OrderedList(t *testing.T) {
 	markdown := `1. 第一项
 2. 第二项

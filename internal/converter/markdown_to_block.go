@@ -468,7 +468,7 @@ func (c *MarkdownToBlock) convertListItem(node *ast.ListItem, isOrdered bool) (*
 	// 只提取直接子节点的文本（跳过嵌套的 ast.List）
 	elements := c.extractListItemDirectElements(node)
 
-	// 收集嵌套子列表
+	// 收集嵌套子列表和代码块
 	var children []*BlockNode
 	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
 		if nestedList, ok := child.(*ast.List); ok {
@@ -477,6 +477,14 @@ func (c *MarkdownToBlock) convertListItem(node *ast.ListItem, isOrdered bool) (*
 				return nil, err
 			}
 			children = append(children, childNodes...)
+		} else if codeBlock, ok := child.(*ast.FencedCodeBlock); ok {
+			block, err := c.convertCodeBlock(codeBlock)
+			if err != nil {
+				return nil, err
+			}
+			if block != nil {
+				children = append(children, &BlockNode{Block: block})
+			}
 		}
 	}
 
