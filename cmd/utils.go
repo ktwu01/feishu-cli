@@ -160,6 +160,16 @@ func currentUserIDFromInfo(info *client.UserInfo, userIDType string) (string, er
 	return "", fmt.Errorf("当前登录用户缺少 %s，无法自动推断当前登录用户身份", userIDType)
 }
 
+// validateEnum validates that value is one of the allowed values.
+func validateEnum(value, fieldName string, allowedValues []string) error {
+	for _, allowed := range allowedValues {
+		if value == allowed {
+			return nil
+		}
+	}
+	return fmt.Errorf("不支持的%s %q，可选值: %s", fieldName, value, strings.Join(allowedValues, ", "))
+}
+
 // mustMarkFlagRequired 标记 flag 为必填，如果失败则 panic
 // 用于 init() 函数中，确保配置错误在启动时被发现
 func mustMarkFlagRequired(cmd *cobra.Command, flags ...string) {

@@ -2,9 +2,9 @@
 name: feishu-cli-msg
 description: >-
   飞书消息发送。发送消息（text/post/interactive 卡片等 11 种类型）、回复消息、
-  转发/合并转发、批量获取消息、下载消息资源（图片/文件）、获取话题回复列表。
+  转发/合并转发、消息加急、批量获取消息、下载消息资源（图片/文件）、获取话题回复列表。
   使用 App Token（Bot 身份），无需登录。
-  当用户请求"发消息"、"回复"、"转发"、"合并转发"、"发通知"、"发卡片"、
+  当用户请求"发消息"、"回复"、"转发"、"合并转发"、"消息加急"、"发通知"、"发卡片"、
   "给某人发飞书消息"、"通知某人"、"批量获取消息"、"下载消息资源"、
   "下载消息图片"、"下载消息文件"、"话题回复"、"thread 消息"时使用，
   即使没有明确说"发送"，只要意图是把信息传达给某人，都应使用此技能。
@@ -461,6 +461,49 @@ feishu-cli msg reply <message_id> --msg-type post --content-file /tmp/post.json
 |------|------|--------|
 | `--msg-type` | 消息类型 | `text` |
 | `--text` / `--content` / `--content-file` | 消息内容（三选一） | 必填 |
+
+## 消息加急
+
+对指定用户发送消息加急通知，支持应用内加急、电话加急和短信加急三种方式。
+
+```bash
+# 应用内加急（默认）
+feishu-cli msg urgent <message_id> \
+  --user-ids ou_xxx,ou_yyy \
+  --user-id-type open_id
+
+# 电话加急
+feishu-cli msg urgent <message_id> \
+  --urgent-type phone \
+  --user-ids u_xxx,u_yyy \
+  --user-id-type user_id
+
+# 短信加急
+feishu-cli msg urgent <message_id> \
+  --urgent-type sms \
+  --user-ids on_xxx,on_yyy \
+  --user-id-type union_id
+```
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `<message_id>` | 消息 ID | 必填 |
+| `--urgent-type` | 加急类型：`app`/`phone`/`sms` | `app` |
+| `--user-ids` | 目标用户 ID 列表（逗号分隔） | 必填 |
+| `--user-id-type` | 用户 ID 类型：`open_id`/`user_id`/`union_id` | `open_id` |
+
+### 加急类型说明
+
+| 类型 | 说明 | 权限 |
+|------|------|------|
+| `app` | 应用内加急通知 | `im:message.urgent` |
+| `phone` | 电话加急（需审批） | `im:message.urgent:phone` |
+| `sms` | 短信加急（需审批） | `im:message.urgent:sms` |
+
+**注意**：
+- 电话和短信加急需要单独申请权限并通过审批
+- 加急通知会向指定用户发送强提醒
+- 建议仅在紧急情况下使用
 
 ## 合并转发
 

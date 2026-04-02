@@ -91,21 +91,11 @@ var msgUrgentCmd = &cobra.Command{
 }
 
 func validateUrgentType(urgentType string) error {
-	switch urgentType {
-	case "app", "phone", "sms":
-		return nil
-	default:
-		return fmt.Errorf("不支持的加急类型 %q，可选值: app, phone, sms", urgentType)
-	}
+	return validateEnum(urgentType, "加急类型", []string{"app", "phone", "sms"})
 }
 
 func validateUrgentUserIDType(userIDType string) error {
-	switch userIDType {
-	case "open_id", "user_id", "union_id":
-		return nil
-	default:
-		return fmt.Errorf("不支持的用户 ID 类型 %q，可选值: open_id, user_id, union_id", userIDType)
-	}
+	return validateEnum(userIDType, "用户 ID 类型", []string{"open_id", "user_id", "union_id"})
 }
 
 func init() {

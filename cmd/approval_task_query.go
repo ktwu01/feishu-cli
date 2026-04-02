@@ -9,6 +9,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	approvalTopicTodo     = "1"
+	approvalTopicDone     = "2"
+	approvalTopicStarted  = "3"
+	approvalTopicCCUnread = "17"
+	approvalTopicCCRead   = "18"
+)
+
 var approvalTaskQueryCmd = &cobra.Command{
 	Use:   "query",
 	Short: "查询审批任务列表",
@@ -125,15 +133,15 @@ var approvalTaskQueryCmd = &cobra.Command{
 func normalizeApprovalTaskTopic(topic string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(topic)) {
 	case "1", "todo":
-		return "1", nil
+		return approvalTopicTodo, nil
 	case "2", "done":
-		return "2", nil
+		return approvalTopicDone, nil
 	case "3", "started", "initiated":
-		return "3", nil
+		return approvalTopicStarted, nil
 	case "17", "cc-unread", "unread-cc":
-		return "17", nil
+		return approvalTopicCCUnread, nil
 	case "18", "cc-read", "read-cc":
-		return "18", nil
+		return approvalTopicCCRead, nil
 	default:
 		return "", fmt.Errorf("不支持的 topic: %s（可选值: todo, done, started, cc-unread, cc-read）", topic)
 	}
@@ -141,15 +149,15 @@ func normalizeApprovalTaskTopic(topic string) (string, error) {
 
 func approvalTaskTopicLabel(topic string) string {
 	switch topic {
-	case "1":
+	case approvalTopicTodo:
 		return "待我审批"
-	case "2":
+	case approvalTopicDone:
 		return "我已审批"
-	case "3":
+	case approvalTopicStarted:
 		return "我发起的审批"
-	case "17":
+	case approvalTopicCCUnread:
 		return "未读抄送"
-	case "18":
+	case approvalTopicCCRead:
 		return "已读抄送"
 	default:
 		return topic

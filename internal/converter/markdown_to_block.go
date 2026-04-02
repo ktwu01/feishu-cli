@@ -437,7 +437,6 @@ func (c *MarkdownToBlock) convertListItem(node *ast.ListItem, isOrdered bool) (*
 					if err != nil {
 						return nil, err
 					}
-					// 收集嵌套子列表
 					children, err := c.collectNestedChildren(node)
 					if err != nil {
 						return nil, err
@@ -453,7 +452,6 @@ func (c *MarkdownToBlock) convertListItem(node *ast.ListItem, isOrdered bool) (*
 					if err != nil {
 						return nil, err
 					}
-					// 收集嵌套子列表
 					children, err := c.collectNestedChildren(node)
 					if err != nil {
 						return nil, err
