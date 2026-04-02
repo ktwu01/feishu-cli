@@ -77,12 +77,14 @@ var msgUrgentCmd = &cobra.Command{
 			})
 		}
 
-		fmt.Printf("消息加急发送成功！\n")
+		if len(result.InvalidUserIDList) > 0 {
+			fmt.Printf("消息加急发送完成（非全部送达）\n")
+			fmt.Printf("  无效用户 ID: %s\n", strings.Join(result.InvalidUserIDList, ","))
+		} else {
+			fmt.Printf("消息加急发送成功！\n")
+		}
 		fmt.Printf("  消息 ID: %s\n", messageID)
 		fmt.Printf("  加急类型: %s\n", urgentType)
-		if len(result.InvalidUserIDList) > 0 {
-			fmt.Printf("  无效用户 ID: %s\n", strings.Join(result.InvalidUserIDList, ","))
-		}
 
 		return nil
 	},
