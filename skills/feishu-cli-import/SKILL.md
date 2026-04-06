@@ -60,6 +60,7 @@ allowed-tools: Bash, Read
 1. **验证文件**
    - 检查 Markdown 文件是否存在
    - 预览文件内容
+   - **编码验证（防御性检查）**：运行 `python3 -c "d=open('<file.md>','rb').read(); assert b'\\xef\\xbf\\xbd' not in d, 'U+FFFD found'; d.decode('utf-8')"` 同时检查 U+FFFD 替换字符和非法 UTF-8 字节。如果报错，**必须先修复再导入**，否则乱码会原样写入飞书文档
 
 2. **执行导入**
    ```bash

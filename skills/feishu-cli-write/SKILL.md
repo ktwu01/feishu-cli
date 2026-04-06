@@ -74,6 +74,7 @@ feishu-cli doc create --title "文档标题" --output json
 2. **生成 Markdown**
    - 在 `/tmp/feishu_write_<timestamp>.md` 创建 Markdown 文件
    - 使用标准 Markdown 语法
+   - **编码验证（防御性检查）**：文件写入后，运行 `python3 -c "d=open('<file.md>','rb').read(); assert b'\\xef\\xbf\\xbd' not in d, 'U+FFFD found'; d.decode('utf-8')"` 同时检查 U+FFFD 替换字符和非法 UTF-8 字节。如果报错，**必须修复后再导入飞书**
 
 3. **导入到飞书**
    ```bash
