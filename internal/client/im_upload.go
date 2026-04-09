@@ -90,7 +90,8 @@ func UploadIMFile(filePath string, fileName string) (string, error) {
 
 // UploadIMImage uploads a local image via the IM API (/open-apis/im/v1/images)
 // and returns the image_key that can be used directly in msg send --msg-type image.
-func UploadIMImage(filePath string) (string, error) {
+// imageType can be "message" (default) for sending as message image, or "avatar" for avatar images.
+func UploadIMImage(filePath string, imageType string) (string, error) {
 	client, err := GetClient()
 	if err != nil {
 		return "", err
@@ -110,9 +111,13 @@ func UploadIMImage(filePath string) (string, error) {
 		return "", fmt.Errorf("图片大小 %s 超过 IM 上传限制（10MB）", formatSize(int(stat.Size())))
 	}
 
+	if imageType == "" {
+		imageType = "message"
+	}
+
 	req := larkim.NewCreateImageReqBuilder().
 		Body(larkim.NewCreateImageReqBodyBuilder().
-			ImageType("message").
+			ImageType(imageType).
 			Image(f).
 			Build()).
 		Build()

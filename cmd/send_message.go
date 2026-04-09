@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/riba2534/feishu-cli/internal/client"
 	"github.com/riba2534/feishu-cli/internal/config"
@@ -25,6 +27,7 @@ var sendMessageCmd = &cobra.Command{
   --text, -t          简单文本消息（快捷方式）
   --file, -f          发送本地文件（自动上传并发送，快捷方式）
   --image             发送本地图片（自动上传并发送，快捷方式）
+  --upload-images     自动解析并上传 post/interactive 消息中的本地图片
   --output, -o        输出格式（json）
 
 接收者类型:
@@ -76,7 +79,15 @@ var sendMessageCmd = &cobra.Command{
     --receive-id-type email \
     --receive-id user@example.com \
     --msg-type interactive \
-    --content-file card.json`,
+    --content-file card.json
+
+  # 发送卡片消息并自动上传本地图片
+  feishu-cli msg send \
+    --receive-id-type email \
+    --receive-id user@example.com \
+    --msg-type interactive \
+    --content-file card.json \
+    --upload-images`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := config.Validate(); err != nil {
 			return err
@@ -92,6 +103,7 @@ var sendMessageCmd = &cobra.Command{
 		text, _ := cmd.Flags().GetString("text")
 		filePath, _ := cmd.Flags().GetString("file")
 		imagePath, _ := cmd.Flags().GetString("image")
+		uploadImages, _ := cmd.Flags().GetBool("upload-images")
 
 		// 互斥校验：5 个内容标志只能指定一个
 		var specifiedFlags []string
@@ -142,7 +154,7 @@ var sendMessageCmd = &cobra.Command{
 		case imagePath != "":
 			// Upload image via IM API, then send as image message
 			fmt.Fprintf(os.Stderr, "正在上传图片: %s\n", filepath.Base(imagePath))
-			imageKey, err := client.UploadIMImage(imagePath)
+			imageKey, err := client.UploadIMImage(imagePath, "")
 			if err != nil {
 				return err
 			}
@@ -166,6 +178,26 @@ var sendMessageCmd = &cobra.Command{
 
 		default:
 			return fmt.Errorf("必须指定 --content、--content-file、--text、--file 或 --image")
+		}
+
+		// 自动上传本地图片（仅对 post 和 interactive 消息有效）
+		if uploadImages && (msgType == "post" || msgType == "interactive") {
+			// 确定 basePath：如果使用 --content-file，以其目录为 basePath；否则用当前目录
+			basePath := "."
+			if contentFile != "" {
+				basePath = filepath.Dir(contentFile)
+				if basePath == "" || basePath == "." {
+					basePath = "."
+				}
+			}
+			processedContent, uploadCount, err := processAndUploadLocalImages(msgContent, basePath)
+			if err != nil {
+				return err
+			}
+			if uploadCount > 0 {
+				fmt.Fprintf(os.Stderr, "已自动上传 %d 张本地图片\n", uploadCount)
+			}
+			msgContent = processedContent
 		}
 
 		messageID, err := client.SendMessage(receiveIDType, receiveID, msgType, msgContent, token)
@@ -199,7 +231,197 @@ func init() {
 	sendMessageCmd.Flags().StringP("text", "t", "", "简单文本消息")
 	sendMessageCmd.Flags().StringP("file", "f", "", "发送本地文件（自动上传并发送）")
 	sendMessageCmd.Flags().String("image", "", "发送本地图片（自动上传并发送）")
+	sendMessageCmd.Flags().Bool("upload-images", false, "自动解析并上传 post/interactive 消息中的本地图片")
 	sendMessageCmd.Flags().StringP("output", "o", "", "输出格式（json）")
 	sendMessageCmd.Flags().String("user-access-token", "", "User Access Token（用户授权令牌）")
 	mustMarkFlagRequired(sendMessageCmd, "receive-id-type", "receive-id")
+}
+
+// markdown 图片正则: ![alt](path)
+var markdownImageRegex = regexp.MustCompile(`!\[([^\]]*)\]\(([^)]+)\)`)
+
+// isLocalPath 检测字符串是否为本地文件路径
+func isLocalPath(s string) bool {
+	if s == "" {
+		return false
+	}
+	// 如果是 URL 或已上传的 image_key（img_ 开头），不是本地路径
+	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") ||
+		strings.HasPrefix(s, "img_") || strings.HasPrefix(s, "file_") {
+		return false
+	}
+	// 检查是否是文件路径（包含 / 或 \ 或扩展名）
+	ext := strings.ToLower(filepath.Ext(s))
+	if ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" ||
+		ext == ".bmp" || ext == ".webp" || ext == ".svg" {
+		return true
+	}
+	// 检查路径分隔符
+	if strings.Contains(s, "/") || strings.Contains(s, "\\") {
+		return true
+	}
+	return false
+}
+
+// processAndUploadLocalImages 解析消息内容中的本地图片路径，上传并替换为 image_key
+// basePath 用于解析相对路径：如果使用 --content-file，以其目录为 basePath；否则用当前目录
+// 返回处理后的内容和上传的图片数量
+func processAndUploadLocalImages(content string, basePath string) (string, int, error) {
+	// 先收集所有本地图片路径
+	type imageReplace struct {
+		oldStr string
+		newStr string
+	}
+	var replacements []imageReplace
+	uploadCount := 0
+
+	// 解析相对路径为绝对路径（与 markdown import 保持一致）
+	resolveLocalPath := func(path string) string {
+		if filepath.IsAbs(path) {
+			return path
+		}
+		return filepath.Join(basePath, path)
+	}
+
+	// 1. 处理 Markdown 语法中的本地图片: ![alt](local/path.png)
+	matches := markdownImageRegex.FindAllStringSubmatch(content, -1)
+	for _, match := range matches {
+		fullMatch := match[0]    // 完整匹配如 ![alt](local/path.png)
+		imagePath := match[2]     // 图片路径
+
+		if !isLocalPath(imagePath) {
+			continue
+		}
+
+		// 解析相对路径
+		resolvedPath := resolveLocalPath(imagePath)
+
+		// 检查文件是否存在
+		if _, err := os.Stat(resolvedPath); err != nil {
+			fmt.Fprintf(os.Stderr, "警告: 跳过不存在的图片: %s\n", resolvedPath)
+			continue
+		}
+
+		// 上传图片
+		fmt.Fprintf(os.Stderr, "正在上传图片: %s\n", resolvedPath)
+		imageKey, err := client.UploadIMImage(resolvedPath, "")
+		if err != nil {
+			return "", 0, fmt.Errorf("上传图片 %s 失败: %w", resolvedPath, err)
+		}
+
+		// 替换为飞书图片格式
+		replacements = append(replacements, imageReplace{
+			oldStr: fullMatch,
+			newStr: fmt.Sprintf("![%s](%s)", match[1], imageKey),
+		})
+		uploadCount++
+	}
+
+	// 2. 尝试解析为 JSON，处理 img 标签中的本地 image_key
+	var jsonData interface{}
+	if err := json.Unmarshal([]byte(content), &jsonData); err == nil {
+		// 是有效的 JSON，递归处理
+		changed, newData, count := processJSONLocalImages(jsonData, basePath)
+		if changed {
+			uploadCount += count
+			processed, err := json.Marshal(newData)
+			if err != nil {
+				return "", 0, fmt.Errorf("序列化处理后的内容失败: %w", err)
+			}
+			content = string(processed)
+		}
+	}
+
+	// 3. 应用 Markdown 替换
+	for _, rep := range replacements {
+		content = strings.ReplaceAll(content, rep.oldStr, rep.newStr)
+	}
+
+	return content, uploadCount, nil
+}
+
+// processJSONLocalImages 递归处理 JSON 结构中的本地图片
+// basePath 用于解析相对路径
+// 返回是否有修改、处理后的数据、上传的图片数量
+func processJSONLocalImages(data interface{}, basePath string) (bool, interface{}, int) {
+	// 解析相对路径为绝对路径
+	resolveLocalPath := func(path string) string {
+		if filepath.IsAbs(path) {
+			return path
+		}
+		return filepath.Join(basePath, path)
+	}
+
+	switch v := data.(type) {
+	case map[string]interface{}:
+		changed := false
+		count := 0
+		newMap := make(map[string]interface{})
+
+		// 检查是否是 img 标签
+		if tag, ok := v["tag"].(string); ok && tag == "img" {
+			if imageKey, ok := v["image_key"].(string); ok && isLocalPath(imageKey) {
+				// 解析相对路径
+				resolvedPath := resolveLocalPath(imageKey)
+
+				// 检查文件是否存在
+				if _, err := os.Stat(resolvedPath); err != nil {
+					fmt.Fprintf(os.Stderr, "警告: 跳过不存在的图片: %s\n", resolvedPath)
+					newMap = v
+				} else {
+					// 上传图片
+					fmt.Fprintf(os.Stderr, "正在上传图片: %s\n", resolvedPath)
+					imageKeyResult, err := client.UploadIMImage(resolvedPath, "")
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "警告: 上传图片 %s 失败: %v\n", resolvedPath, err)
+						newMap = v
+					} else {
+						newMap = map[string]interface{}{
+							"tag":       "img",
+							"image_key": imageKeyResult,
+						}
+						// 保留 width 和 height 如果存在
+						if w, ok := v["width"].(float64); ok {
+							newMap["width"] = w
+						}
+						if h, ok := v["height"].(float64); ok {
+							newMap["height"] = h
+						}
+						changed = true
+						count = 1
+					}
+				}
+			} else {
+				newMap = v
+			}
+		} else {
+			// 递归处理所有字段
+			for key, val := range v {
+				c, newVal, n := processJSONLocalImages(val, basePath)
+				if c {
+					changed = true
+					count += n
+				}
+				newMap[key] = newVal
+			}
+		}
+		return changed, newMap, count
+
+	case []interface{}:
+		changed := false
+		count := 0
+		newArr := make([]interface{}, len(v))
+		for i, item := range v {
+			c, newItem, n := processJSONLocalImages(item, basePath)
+			if c {
+				changed = true
+				count += n
+			}
+			newArr[i] = newItem
+		}
+		return changed, newArr, count
+
+	default:
+		return false, v, 0
+	}
 }
