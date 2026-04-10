@@ -245,7 +245,7 @@ func PollDeviceToken(appID, appSecret, baseURL, deviceCode string, interval, exp
 		case "access_denied":
 			return nil, fmt.Errorf("用户拒绝了授权")
 		case "expired_token", "invalid_grant":
-			return nil, fmt.Errorf("授权码已过期，请重新执行 feishu-cli auth login --method device")
+			return nil, fmt.Errorf("授权码已过期，请重新执行 feishu-cli auth login")
 		default:
 			desc, _ := raw["error_description"].(string)
 			if desc == "" {
@@ -259,9 +259,9 @@ func PollDeviceToken(appID, appSecret, baseURL, deviceCode string, interval, exp
 	}
 
 	if attempts >= maxPollAttempts {
-		return nil, fmt.Errorf("超过最大轮询次数（%d 次），请重新执行 feishu-cli auth login --method device", maxPollAttempts)
+		return nil, fmt.Errorf("超过最大轮询次数（%d 次），请重新执行 feishu-cli auth login", maxPollAttempts)
 	}
-	return nil, fmt.Errorf("授权超时（设备码已过期），请重新执行 feishu-cli auth login --method device")
+	return nil, fmt.Errorf("授权超时（设备码已过期），请重新执行 feishu-cli auth login")
 }
 
 func deviceFlowToFloat64(v interface{}, defaultVal float64) float64 {

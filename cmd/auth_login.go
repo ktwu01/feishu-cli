@@ -13,133 +13,104 @@ import (
 var authLoginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "登录授权（获取 User Access Token）",
-	Long: `通过 OAuth 2.0 完成用户授权，支持两种模式:
+	Long: `通过 OAuth 2.0 Device Flow（RFC 8628）完成用户授权。
 
-Authorization Code Flow（默认）:
-  需要在飞书开放平台配置重定向 URL。
-  · 本地桌面环境: 自动启动本地 HTTP 服务器并打开浏览器完成回调。
-  · 远程 SSH 环境（自动检测或 --manual）: 打印授权 URL，手动复制回调 URL 粘贴到终端。
-  · 非交互模式（--print-url）: 仅输出授权 URL JSON，配合 auth callback 两步完成。
-
-Device Flow（--method device，RFC 8628）:
-  无需在飞书开放平台配置重定向 URL 白名单。
-  终端显示用户码，用户在任意浏览器打开链接输入用户码完成授权，命令自动轮询等待结果。
+无需在飞书开放平台配置任何重定向 URL 白名单。终端显示用户码和验证链接，
+用户在任意浏览器打开链接输入用户码完成授权，命令自动轮询等待结果。
 
 Token 保存位置: ~/.feishu-cli/token.json
 
-Authorization Code Flow 前置条件:
-  在飞书开放平台 → 应用详情 → 安全设置 → 重定向 URL 中添加:
-  http://127.0.0.1:9768/callback
-
 示例:
-  # 自动检测环境
+  # 标准登录（人类用户，本地或 SSH 远程均可）
   feishu-cli auth login
 
-  # 强制手动模式（SSH 远程环境）
-  feishu-cli auth login --manual
+  # JSON 输出模式（AI Agent 推荐：run_in_background + 读 stdout 事件流）
+  feishu-cli auth login --json
 
-  # 指定端口
-  feishu-cli auth login --port 8080
+  # 两步模式第一步：只请求 device_code 并输出，不启动轮询
+  feishu-cli auth login --no-wait --json
 
-  # 指定 scope（建议带 offline_access 以获取 refresh_token）
-  feishu-cli auth login --scopes "search:docs:read search:message offline_access"
-
-  # 非交互模式（AI Agent 推荐）
-  feishu-cli auth login --print-url
-  # 然后用户在浏览器完成授权后执行:
-  feishu-cli auth callback "<回调URL>" --state "<state>"
-
-  # Device Flow（无需配置重定向 URL 白名单）
-  feishu-cli auth login --method device`,
+  # 两步模式第二步：用已有的 device_code 继续轮询
+  feishu-cli auth login --device-code <device_code> --json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := config.Validate(); err != nil {
 			return err
 		}
 
 		cfg := config.Get()
-		scopes, _ := cmd.Flags().GetString("scopes")
-		method, _ := cmd.Flags().GetString("method")
+		jsonOutput, _ := cmd.Flags().GetBool("json")
+		noWait, _ := cmd.Flags().GetBool("no-wait")
+		deviceCode, _ := cmd.Flags().GetString("device-code")
 
-		switch method {
-		case "device":
-			return runDeviceFlow(cfg.AppID, cfg.AppSecret, cfg.BaseURL, scopes)
-		case "code", "":
-			// Authorization Code Flow，继续往下
-		default:
-			return fmt.Errorf("不支持的授权方式 %q，可选值: code, device", method)
-		}
-
-		// Authorization Code Flow
-		port, _ := cmd.Flags().GetInt("port")
-		manual, _ := cmd.Flags().GetBool("manual")
-		noManual, _ := cmd.Flags().GetBool("no-manual")
-		printURL, _ := cmd.Flags().GetBool("print-url")
-
-		opts := auth.LoginOptions{
-			Port:      port,
-			Manual:    manual,
-			NoManual:  noManual,
-			AppID:     cfg.AppID,
-			AppSecret: cfg.AppSecret,
-			BaseURL:   cfg.BaseURL,
-			Scopes:    scopes,
-		}
-
-		if printURL {
-			result, err := auth.GenerateAuthURL(opts)
-			if err != nil {
-				return err
-			}
-			return printJSON(result)
-		}
-
-		token, err := auth.Login(opts)
-		if err != nil {
-			return err
-		}
-
-		printTokenSuccess(token)
-		return nil
+		return runDeviceFlow(cfg, jsonOutput, deviceCode, noWait)
 	},
 }
 
-// runDeviceFlow 执行 Device Flow 授权（RFC 8628）
-func runDeviceFlow(appID, appSecret, baseURL, scope string) error {
-	deviceResp, err := auth.RequestDeviceAuthorization(appID, appSecret, baseURL, scope)
-	if err != nil {
-		return err
+// runDeviceFlow 执行 Device Flow 授权（RFC 8628）。
+//
+// 根据 deviceCode / noWait 参数触发四种行为：默认阻塞轮询；--json 事件流；
+// --no-wait 立即返回 device_code 不轮询；--device-code 复用已有 device_code 继续轮询。
+func runDeviceFlow(cfg *config.Config, jsonOutput bool, deviceCode string, noWait bool) error {
+	appID := cfg.AppID
+	appSecret := cfg.AppSecret
+	baseURL := cfg.BaseURL
+
+	var deviceResp *auth.DeviceAuthResponse
+
+	if deviceCode == "" {
+		// 步骤一：请求 device_authorization。
+		// scope 传空，device_flow.go 会自动注入 offline_access；飞书 token 端点
+		// 实际返回的 scope 由应用在开放平台预配置的权限决定。
+		resp, err := auth.RequestDeviceAuthorization(appID, appSecret, baseURL, "")
+		if err != nil {
+			return err
+		}
+		deviceResp = resp
+
+		if jsonOutput || noWait {
+			event := map[string]any{
+				"event":                     "device_authorization",
+				"verification_uri":          deviceResp.VerificationURI,
+				"verification_uri_complete": deviceResp.VerificationURIComplete,
+				"user_code":                 deviceResp.UserCode,
+				"device_code":               deviceResp.DeviceCode,
+				"expires_in":                deviceResp.ExpiresIn,
+				"interval":                  deviceResp.Interval,
+			}
+			if err := printJSONLine(event); err != nil {
+				return err
+			}
+		} else {
+			printDeviceAuthHuman(deviceResp)
+			_ = auth.TryOpenBrowser(bestVerificationURL(deviceResp))
+		}
+
+		if noWait {
+			return nil
+		}
+	} else {
+		// 两步模式第二步：复用调用方提供的 device_code，用保守的默认轮询参数。
+		// 与官方 lark-cli 的 authLoginPollDeviceCode 行为对齐。
+		deviceResp = &auth.DeviceAuthResponse{
+			DeviceCode: deviceCode,
+			Interval:   5,
+			ExpiresIn:  180,
+		}
 	}
 
-	fmt.Fprintln(os.Stderr, "\n请在浏览器中完成以下操作:")
-	fmt.Fprintln(os.Stderr, "─────────────────────────────────────────────")
-	fmt.Fprintf(os.Stderr, "  1. 打开链接: %s\n", deviceResp.VerificationURI)
-	fmt.Fprintf(os.Stderr, "  2. 输入用户码: %s\n", formatUserCode(deviceResp.UserCode))
-	fmt.Fprintln(os.Stderr, "─────────────────────────────────────────────")
-	if deviceResp.VerificationURIComplete != "" && deviceResp.VerificationURIComplete != deviceResp.VerificationURI {
-		fmt.Fprintf(os.Stderr, "\n或直接访问完整链接（含用户码）:\n  %s\n", deviceResp.VerificationURIComplete)
+	// 步骤二：轮询 token 端点。
+	onTick := func(elapsed, total int) {
+		if jsonOutput {
+			return
+		}
+		fmt.Fprintf(os.Stderr, "\r  轮询中... 已等待 %ds / %ds", elapsed, total)
 	}
-	fmt.Fprintf(os.Stderr, "\n等待授权（%d 秒后过期）...\n", deviceResp.ExpiresIn)
-
-	openURL := deviceResp.VerificationURIComplete
-	if openURL == "" {
-		openURL = deviceResp.VerificationURI
-	}
-	_ = auth.TryOpenBrowser(openURL)
-
-	lastLine := ""
 	token, err := auth.PollDeviceToken(
 		appID, appSecret, baseURL,
 		deviceResp.DeviceCode, deviceResp.Interval, deviceResp.ExpiresIn,
-		func(elapsed, total int) {
-			line := fmt.Sprintf("\r  轮询中... 已等待 %ds / %ds", elapsed, total)
-			if len(line) < len(lastLine) {
-				line += strings.Repeat(" ", len(lastLine)-len(line))
-			}
-			lastLine = line
-			fmt.Fprint(os.Stderr, line)
-		},
+		onTick,
 	)
-	if lastLine != "" {
+	if !jsonOutput {
 		fmt.Fprintln(os.Stderr)
 	}
 	if err != nil {
@@ -150,11 +121,44 @@ func runDeviceFlow(appID, appSecret, baseURL, scope string) error {
 		return err
 	}
 
+	if jsonOutput {
+		event := map[string]any{
+			"event":      "authorization_success",
+			"expires_at": token.ExpiresAt.Format("2006-01-02T15:04:05+08:00"),
+			"scope":      token.Scope,
+		}
+		if !token.RefreshExpiresAt.IsZero() {
+			event["refresh_expires_at"] = token.RefreshExpiresAt.Format("2006-01-02T15:04:05+08:00")
+		}
+		return printJSONLine(event)
+	}
+
 	printTokenSuccess(token)
 	return nil
 }
 
-// formatUserCode 将用户码格式化为易读形式（8 位时加连字符，如 ABCD-EFGH）
+// bestVerificationURL 优先返回 VerificationURIComplete，否则回退到 VerificationURI。
+func bestVerificationURL(resp *auth.DeviceAuthResponse) string {
+	if resp.VerificationURIComplete != "" {
+		return resp.VerificationURIComplete
+	}
+	return resp.VerificationURI
+}
+
+// printDeviceAuthHuman 把设备授权信息按人类友好格式打印到 stderr。
+func printDeviceAuthHuman(resp *auth.DeviceAuthResponse) {
+	fmt.Fprintln(os.Stderr, "\n请在浏览器中完成以下操作:")
+	fmt.Fprintln(os.Stderr, "─────────────────────────────────────────────")
+	fmt.Fprintf(os.Stderr, "  1. 打开链接: %s\n", resp.VerificationURI)
+	fmt.Fprintf(os.Stderr, "  2. 输入用户码: %s\n", formatUserCode(resp.UserCode))
+	fmt.Fprintln(os.Stderr, "─────────────────────────────────────────────")
+	if resp.VerificationURIComplete != "" && resp.VerificationURIComplete != resp.VerificationURI {
+		fmt.Fprintf(os.Stderr, "\n或直接访问完整链接（含用户码）:\n  %s\n", resp.VerificationURIComplete)
+	}
+	fmt.Fprintf(os.Stderr, "\n等待授权（%d 秒后过期）...\n", resp.ExpiresIn)
+}
+
+// formatUserCode 将 8 位无分隔符的用户码格式化为 ABCD-EFGH。
 func formatUserCode(code string) string {
 	if strings.ContainsAny(code, "-_ ") {
 		return code
@@ -165,7 +169,7 @@ func formatUserCode(code string) string {
 	return code
 }
 
-// printTokenSuccess 打印授权成功信息
+// printTokenSuccess 打印授权成功信息到 stderr（人类模式）。
 func printTokenSuccess(token *auth.TokenStore) {
 	path, _ := auth.TokenPath()
 	fmt.Fprintln(os.Stderr, "\n✓ 授权成功！")
@@ -182,10 +186,7 @@ func printTokenSuccess(token *auth.TokenStore) {
 func init() {
 	authCmd.AddCommand(authLoginCmd)
 
-	authLoginCmd.Flags().Int("port", auth.DefaultPort, "本地回调服务器端口（Authorization Code Flow）")
-	authLoginCmd.Flags().Bool("manual", false, "强制使用手动粘贴模式（Authorization Code Flow）")
-	authLoginCmd.Flags().Bool("no-manual", false, "强制使用本地回调模式（Authorization Code Flow）")
-	authLoginCmd.Flags().Bool("print-url", false, "仅输出授权 URL 和 state（Authorization Code Flow 非交互模式）")
-	authLoginCmd.Flags().String("scopes", "", "请求的 OAuth scope（空格分隔，如 \"search:docs:read offline_access\"）")
-	authLoginCmd.Flags().String("method", "code", "授权方式：code（Authorization Code Flow）或 device（Device Flow，无需配置重定向 URL）")
+	authLoginCmd.Flags().Bool("json", false, "JSON 输出模式（AI Agent 友好，事件流写入 stdout）")
+	authLoginCmd.Flags().Bool("no-wait", false, "只请求 device_code 并立即输出，不启动轮询（两步模式第一步）")
+	authLoginCmd.Flags().String("device-code", "", "用已有的 device_code 继续轮询（两步模式第二步）")
 }

@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"os"
 	"os/exec"
 	"runtime"
 )
@@ -24,22 +23,13 @@ func openBrowser(url string) error {
 	return nil
 }
 
-// TryOpenBrowser 尝试打开浏览器（仅本地桌面环境有效，失败时静默忽略）
+// TryOpenBrowser 尝试打开浏览器。
+//
+// 与环境无关，无论本地桌面还是 SSH 远程都会尝试调用本地 open/xdg-open，
+// 命令失败时静默返回 error（调用方通常 `_ = TryOpenBrowser(...)` 忽略）。
+//
+// 设计目的：Device Flow 在所有环境下都只把链接打印到 stderr，
+// 若本机有 GUI 则顺便尝试打开，没有 GUI 则无副作用。
 func TryOpenBrowser(url string) error {
-	if !isLocalEnvironment() {
-		return nil
-	}
 	return openBrowser(url)
-}
-
-// isLocalEnvironment 检测是否为本地桌面环境
-func isLocalEnvironment() bool {
-	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
-		return true
-	}
-	// Linux：检查 DISPLAY 或 WAYLAND_DISPLAY
-	if os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != "" {
-		return true
-	}
-	return false
 }

@@ -105,13 +105,18 @@ func clearCurrentUserCacheBestEffort() {
 	_ = DeleteCurrentUserCache()
 }
 
-// IsAccessTokenValid 检查 access_token 是否有效（预留 60s 缓冲）
+// tokenRefreshAhead 是 token 过期前主动刷新的时间窗口，对齐官方 lark-cli 的 refreshAheadMs（5 分钟）。
+// 窗口过小会让运行时间较长的命令（如大文档导入、长时间搜索）在执行途中遇到 token 过期。
+const tokenRefreshAhead = 5 * time.Minute
+
+// IsAccessTokenValid 检查 access_token 是否有效（预留 5 分钟缓冲）。
 func (t *TokenStore) IsAccessTokenValid() bool {
-	return t.AccessToken != "" && time.Now().Add(60*time.Second).Before(t.ExpiresAt)
+	return t.AccessToken != "" && time.Now().Add(tokenRefreshAhead).Before(t.ExpiresAt)
 }
 
-// IsRefreshTokenValid 检查 refresh_token 是否有效（预留 60s 缓冲）
-// 当 RefreshExpiresAt 为零值时（服务端未返回过期时间），假定有效，让服务端决定
+// IsRefreshTokenValid 检查 refresh_token 是否有效。
+// 当 RefreshExpiresAt 为零值时（服务端未返回过期时间），假定有效，让服务端决定。
+// 有值时预留 5 分钟缓冲，与 access_token 策略一致。
 func (t *TokenStore) IsRefreshTokenValid() bool {
 	if t.RefreshToken == "" {
 		return false
@@ -119,7 +124,7 @@ func (t *TokenStore) IsRefreshTokenValid() bool {
 	if t.RefreshExpiresAt.IsZero() {
 		return true
 	}
-	return time.Now().Add(60 * time.Second).Before(t.RefreshExpiresAt)
+	return time.Now().Add(tokenRefreshAhead).Before(t.RefreshExpiresAt)
 }
 
 // MaskToken 对 token 脱敏显示（前 6 + 后 6）

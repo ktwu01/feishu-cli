@@ -201,8 +201,8 @@ func loadJSONInput(inlineValue, filePath, inlineFlag, fileFlag, label string) (s
 	return inlineValue, nil
 }
 
-// printJSON 安全地打印 JSON 格式的数据
-// 如果序列化失败，会返回错误而不是静默忽略
+// printJSON 把 v 编码为带 2 空格缩进的 JSON 写到 stdout，禁用 HTML 转义。
+// 用于命令一次性输出结构化结果（auth status、search docs -o json 等）。
 func printJSON(v any) error {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -211,6 +211,21 @@ func printJSON(v any) error {
 	if err := enc.Encode(v); err != nil {
 		return fmt.Errorf("JSON 序列化失败: %w", err)
 	}
+	fmt.Print(buf.String())
+	return nil
+}
+
+// printJSONLine 把 v 编码为单行紧凑 JSON 写到 stdout，禁用 HTML 转义。
+// 用于事件流（JSONL），例如 `auth login --json` 一次授权中依次输出
+// device_authorization / authorization_success 两行事件。
+func printJSONLine(v any) error {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return fmt.Errorf("JSON 序列化失败: %w", err)
+	}
+	// json.Encoder.Encode 已经追加了 \n，直接写出即可。
 	fmt.Print(buf.String())
 	return nil
 }
