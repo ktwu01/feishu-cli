@@ -533,28 +533,28 @@ feishu-cli approval task query --topic cc-unread --user-access-token <token>
 </details>
 
 <details>
-<summary>身份认证</summary>
+<summary>身份认证（Device Flow）</summary>
 
-通过 OAuth 2.0 获取 User Access Token，用于搜索、审批待办查询等需要用户授权的功能。
+通过 **OAuth 2.0 Device Flow（RFC 8628）** 获取 User Access Token，用于搜索、审批待办查询等需要用户授权的功能。**无需在飞书开放平台配置任何重定向 URL 白名单**。
 
-**前置条件**：在飞书开放平台 → 应用详情 → 安全设置 → 重定向 URL 中添加 `http://127.0.0.1:9768/callback`
+> **v1.18+ 变更**：Authorization Code Flow（`--print-url` / `auth callback` / `--manual` / `--port` / `--method` / `--scopes`）已全部删除，只保留 Device Flow。
 
 ```bash
-# 登录授权（自动打开浏览器完成 OAuth）
+# 登录（Device Flow，本地桌面和 SSH 远程均可，无差别）
 feishu-cli auth login
 
-# SSH 远程环境使用手动模式
-feishu-cli auth login --manual
+# JSON 事件流输出（AI Agent 推荐，配合 run_in_background 使用）
+feishu-cli auth login --json
 
-# 指定端口（默认 9768）
-feishu-cli auth login --port 8080
+# 两步模式：先立即输出 device_code，不启动轮询
+feishu-cli auth login --no-wait --json
 
-# 指定 OAuth scope（建议加 offline_access 以获取 Refresh Token）
-feishu-cli auth login --scopes "search:docs:read search:message offline_access"
+# 两步模式：用已有 device_code 继续轮询
+feishu-cli auth login --device-code <device_code> --json
 
-# 非交互模式（AI Agent 推荐，不阻塞 stdin）
-feishu-cli auth login --print-url                # 步骤 1：输出授权 URL 和 state
-feishu-cli auth callback "<回调URL>" --state "<state>"  # 步骤 2：用回调 URL 换 token
+# 预检 token 是否包含所需 scope（AI Agent 推荐在执行业务命令前调用）
+feishu-cli auth check --scope "search:docs:read"
+feishu-cli auth check --scope "search:docs:read im:message:readonly"
 
 # 查看当前授权状态
 feishu-cli auth status
@@ -563,6 +563,8 @@ feishu-cli auth status -o json  # JSON 格式输出
 # 退出登录（清除本地 token）
 feishu-cli auth logout
 ```
+
+登录时 CLI 在 stderr 打印验证链接和 user_code，用户在任意设备（电脑、手机）浏览器打开链接完成授权即可。本地桌面会尝试自动打开浏览器，SSH 远程失败静默忽略。
 
 **Token 管理**：
 - Token 保存在 `~/.feishu-cli/token.json`，Access Token 有效期约 2 小时
