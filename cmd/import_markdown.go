@@ -621,7 +621,6 @@ func phase1CreateBlocks(
 				if idx < len(createdBlockIDs) {
 					parentID := createdBlockIDs[idx]
 
-
 					nestedCount, nestedErr := createNestedChildren(documentID, parentID, children)
 					if nestedErr != nil {
 						if verbose {
@@ -1128,14 +1127,14 @@ func createNestedChildren(documentID string, parentBlockID string, children []*c
 			if err != nil {
 				return totalCreated, err
 			}
-			// QuoteContainer / Callout 嵌套场景：在子块创建完成后清理自动生成的空块
-			if child.Block.BlockType != nil {
-				switch *child.Block.BlockType {
-				case int(converter.BlockTypeQuoteContainer):
-					deleteContainerAutoEmptyBlock(documentID, childID, "QuoteContainer")
-				case int(converter.BlockTypeCallout):
-					deleteContainerAutoEmptyBlock(documentID, childID, "Callout")
-				}
+		}
+		// QuoteContainer / Callout 嵌套场景：无论是否有子块，均清理 API 自动生成的空块
+		if child.Block.BlockType != nil {
+			switch *child.Block.BlockType {
+			case int(converter.BlockTypeQuoteContainer):
+				deleteContainerAutoEmptyBlock(documentID, childID, "QuoteContainer")
+			case int(converter.BlockTypeCallout):
+				deleteContainerAutoEmptyBlock(documentID, childID, "Callout")
 			}
 		}
 	}

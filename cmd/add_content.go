@@ -151,11 +151,16 @@ func deleteContainerAutoEmptyBlock(documentID, parentID, blockTypeName string) {
 	if firstChild.BlockType == nil || *firstChild.BlockType != int(converter.BlockTypeText) {
 		return
 	}
-	// 检查是否为空文本块（无元素或所有 TextRun 内容为空字符串）
+	// 检查是否为空文本块：任何非空 TextRun 或非 TextRun 类型的元素（Link/MentionUser 等）
+	// 均视为有内容，不删除；只有 Elements 为空或全是 content="" 的 TextRun 才是自动生成的空块
 	if firstChild.Text != nil {
 		for _, elem := range firstChild.Text.Elements {
+			if elem.MentionUser != nil || elem.MentionDoc != nil || elem.File != nil ||
+				elem.Reminder != nil || elem.InlineBlock != nil || elem.Equation != nil {
+				return // 有非 TextRun 元素（@用户/@文档/附件/提醒/内联块/公式），不删
+			}
 			if elem.TextRun != nil && elem.TextRun.Content != nil && *elem.TextRun.Content != "" {
-				return
+				return // 有非空文本，不删
 			}
 		}
 	}
