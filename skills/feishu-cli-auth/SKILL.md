@@ -191,7 +191,7 @@ task = Bash(command='feishu-cli auth login --scope "search:docs:read search:mess
 
 ### 方案 B：--no-wait / --device-code 两步模式（高级）
 
-如果 AI Agent 需要把"请求 device_code"和"轮询 token"拆到两个独立的 Bash 调用里（比如中间有其他任务要做），用对齐官方 lark-cli 的两步模式：
+如果 AI Agent 需要把"请求 device_code"和"轮询 token"拆到两个独立的 Bash 调用里（比如中间有其他任务要做），使用两步模式：
 
 ```bash
 # 步骤 1: 只请求 device_code，立即退出（不轮询）
@@ -297,9 +297,11 @@ feishu-cli auth status -o json
     "user_id": "xxx"
   },
   "expires_at": "2026-04-12T17:39:38+08:00",
+  "health": "healthy",
   "identity": "user",
   "logged_in": true,
   "refresh_expires_at": "2026-04-19T15:39:38+08:00",
+  "refresh_token_present": true,
   "refresh_token_valid": true,
   "scope": "base:app:read ...",
   "token_status": "valid"
@@ -309,7 +311,12 @@ feishu-cli auth status -o json
 **字段说明：**
 - `identity`：身份类型，`user`（User Access Token）或 `bot`（App Access Token）
 - `cached_user`：缓存的当前登录用户信息（首次登录后自动拉取并缓存到 `~/.feishu-cli/user_profile.json`）
-- `token_status`：Token 状态，`valid` / `expired` / `refresh_needed` 等
+- `token_status`：Token 状态，`valid`（仍有效）/ `needs_refresh`（access_token 快过期但 refresh_token 有效，下次调用会自动刷新）/ `expired`（都过期）
+- `refresh_token_present`：登录时是否拿到 refresh_token。`false` 通常意味着应用未在开放平台开通 `offline_access`
+- `health`：综合健康度，AI Agent 推荐只判断这个字段——
+  - `healthy`：一切正常
+  - `needs_relogin`：曾有 refresh_token 但已过期，必须重新 `auth login`
+  - `missing_refresh_token`：登录时就没拿到 refresh_token，access_token 过期后需重新 `auth login`
 
 **未登录：**
 
@@ -340,6 +347,13 @@ feishu-cli auth status -o json --verify
 4. `config.yaml` 中的 `user_access_token` 静态配置
 
 **刷新过程对用户透明**：stderr 输出 `[自动刷新] 刷新成功...`，命令正常执行。
+
+**刷新响应的兜底策略**（v1.19.2+）：OAuth 规范允许刷新端点不返回新的 `refresh_token`（表示复用原值）。CLI 实现如下兜底，避免单次响应缺字段就让本地 `refresh_token` 丢失：
+- 响应缺 `refresh_token` → 复用 token.json 中原有值
+- 响应缺 `refresh_token_expires_in` → 保留原 `refresh_expires_at`
+- 响应缺 `scope` → 保留原 scope
+
+请求统一使用 `application/x-www-form-urlencoded` 编码（OAuth 2.0 标准）。
 
 ---
 
@@ -424,7 +438,8 @@ feishu-cli auth logout
 | `"User Access Token 已过期"` | token.json 中 access + refresh 都过期 | 重新 `auth login` |
 | 搜索报 `99991679 Unauthorized` | Token scope 不满足 | `auth check --scope "..."` 定位缺失；在飞书开放平台应用权限管理页面补权限后重新 `auth login` |
 | 搜索报 `99991672 Access denied` | 应用未开通所需权限 | 在飞书开放平台应用权限管理页面开通对应 scope，然后重新 `auth login` |
-| Refresh Token 为空 | 罕见：服务端未返回 refresh_token | 重新 `auth login`（CLI 强制注入 `offline_access`） |
+| `auth status -o json` 显示 `health: missing_refresh_token`（登录时未获取到 refresh_token） | **最常见原因**：应用未在飞书开放平台开通 `offline_access` scope。CLI 虽强制把 `offline_access` 塞进 Device Flow 请求，但飞书服务端按应用配置下发 token，未开通则不返回 refresh_token | 1. 打开飞书开放平台 → 应用权限管理页面确认 `offline_access` 已开通；2. `feishu-cli auth logout && feishu-cli auth login` 重新授权；3. 再跑 `auth status -o json` 确认 `refresh_token_present: true`；4. 若仍失败请反馈 [issue #94](https://github.com/riba2534/feishu-cli/issues/94) |
+| `auth status -o json` 显示 `health: needs_relogin` | refresh_token 也过期了（默认 7 天） | 重新 `auth login` |
 | `"授权码已过期"` | 设备码 240 秒内未完成授权 | 重新 `auth login`，尽快完成浏览器授权 |
 | `"用户拒绝了授权"` | 用户在飞书授权页点了拒绝 | 重新 `auth login`，这次点「允许」 |
 | 轮询长时间卡在 `authorization_pending` | 用户还未在浏览器完成授权 | 提醒用户打开链接并输入 user_code |

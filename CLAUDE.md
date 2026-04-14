@@ -43,7 +43,7 @@ feishu-cli/
 │   ├── auth/                     # OAuth 认证模块（Device Flow）
 │   │   ├── device_flow.go        # RFC 8628 Device Flow 实现（RequestDeviceAuthorization + PollDeviceToken）
 │   │   ├── app_registration.go   # 一键创建应用的 Device Flow 实现
-│   │   ├── oauth.go              # Refresh Token + doTokenRequest
+│   │   ├── oauth.go              # RefreshAccessToken（form-urlencoded + 响应字段兜底复用）
 │   │   ├── resolve.go            # Token 优先级链（ResolveUserAccessToken）
 │   │   ├── token.go              # Token 持久化（Load/Save/Delete）
 │   │   ├── scope.go              # MissingScopes / GrantedScopes（auth check 用）
@@ -264,7 +264,7 @@ feishu-cli sheet export <token> -o output.xlsx                                  
 feishu-cli sheet export <token> --format csv --sheet-id SHEET_ID -o output.csv       # 导出为 CSV
 
 # === 多维表格（Bitable / Base）— 底层 base/v3 API ===
-# 注意：统一使用 --base-token（对齐官方 v3 命名）
+# 注意：统一使用 --base-token（与 base/v3 API 命名一致）
 feishu-cli bitable create --name "项目管理" --time-zone Asia/Shanghai     # 创建多维表格
 feishu-cli bitable get --base-token bscnxxxx                              # 获取多维表格信息
 feishu-cli bitable copy --base-token bscnxxxx --name "副本"

@@ -40,7 +40,7 @@ feishu-cli config add-scopes --domain all
 ### Breaking Changes — 多维表格（bitable）切换到 `base/v3` API
 
 **旧实现**：`bitable` 模块全部调用 `/open-apis/bitable/v1/apps/{app_token}/...` 老 API，覆盖 ~30 个基础 CRUD 命令。
-**新实现**：全面切换到 `/open-apis/base/v3/bases/{base_token}/...` 新 API，与官方 `lark-cli` 对齐，覆盖 48 个命令，支持深度能力（视图完整配置读写、记录 upsert、修改历史、角色 CRUD、高级权限、数据聚合、工作流查询）。
+**新实现**：全面切换到 `/open-apis/base/v3/bases/{base_token}/...` 新 API，覆盖 48 个命令，支持深度能力（视图完整配置读写、记录 upsert、修改历史、角色 CRUD、高级权限、数据聚合、工作流查询）。
 
 #### 命令名迁移表
 
@@ -80,8 +80,8 @@ feishu-cli config add-scopes --domain all
 - **Base create 支持时区**：`--time-zone Asia/Shanghai`
 
 #### Flag 变化
-- **删除 `--app-token` 别名**：只保留 `--base-token`（对齐官方 v3 命名，不再做兼容别名）
-- `bitable create` 的 `--description` 被删除（官方 base/v3 不支持），新增 `--time-zone`
+- **删除 `--app-token` 别名**：只保留 `--base-token`（与 base/v3 API 命名一致，不再做兼容别名）
+- `bitable create` 的 `--description` 被删除（base/v3 不支持），新增 `--time-zone`
 - `bitable data-query` 的 `--table-id` 被删除（v3 端点挂在 base 下）
 
 #### 删除的文件
@@ -95,7 +95,7 @@ feishu-cli config add-scopes --domain all
 
 ---
 
-### Breaking Changes — VC（视频会议）对齐官方实现
+### Breaking Changes — VC（视频会议）改造升级
 
 - **`vc search`**：底层 API 从 `GET /meeting_list` 切换到 `POST /meetings/search`。
   - 新增 flag：`--query` / `--organizer-ids` / `--participant-ids` / `--room-ids`
@@ -124,7 +124,7 @@ feishu-cli config add-scopes --domain all
 | `drive download` | 流式下载 + 路径校验 + `--overwrite` / `--timeout` |
 | `drive export` | 新增 **markdown 快捷路径**：docx → markdown 走 `/docs/v1/content` 直接拉取，不跑异步 export task；支持 sheet / bitable 按 `--sub-id` 导出 CSV；有界轮询（10×5s）+ 超时返回 resume 命令 |
 | `drive export-download` | 通过 `file_token` 直接下载已完成的导出任务产物，配合 `drive export` 超时后接力完成 |
-| `drive import` | **切换到 `/medias/upload_*` 端点 + `parent_type=ccm_import_open` + `extra` 字段**（对齐官方，不再在用户云盘留下中间文件）；格式特定大小限制（docx 20MB / sheet 20MB / bitable 100MB）；有界轮询 + resume |
+| `drive import` | **切换到 `/medias/upload_*` 端点 + `parent_type=ccm_import_open` + `extra` 字段**（不再在用户云盘留下中间文件）；格式特定大小限制（docx 20MB / sheet 20MB / bitable 100MB）；有界轮询 + resume |
 | `drive move` | 文件夹移动自动轮询 `task_check`（30×2s），文件移动同步返回 |
 | `drive add-comment` | 支持**富文本 `reply_elements`**（text / mention_user / link）+ `--block-id` 局部评论（docx）+ **wiki URL 自动解析**成 docx token |
 | `drive task-result` | 通用异步任务查询（`--scenario import/export/task_check`），配合 drive export / import / move 的超时 resume |
@@ -182,7 +182,7 @@ feishu-cli config add-scopes --domain all
 
 ## [v1.18.0] - 未发布
 
-### Breaking Changes — OAuth 认证全面对齐官方 lark-cli
+### Breaking Changes — OAuth 认证全面切换到 Device Flow
 
 彻底删除 Authorization Code Flow，只保留 Device Flow（RFC 8628）。本地桌面、SSH 远程、容器、CI 全环境统一使用同一条命令，**无需任何重定向 URL 白名单配置**。
 
@@ -193,7 +193,7 @@ feishu-cli config add-scopes --domain all
 - `--manual` — SSH 远程手动粘贴回调模式（Device Flow 下 SSH 和本地一视同仁）
 - `--no-manual` — 强制本地回调模式（本地回调 HTTP server 已移除）
 - `--port` — 本地回调端口（不再需要）
-- `--print-url` — 非交互两步式第一步（改用 `--no-wait` + `--device-code` 对齐官方）
+- `--print-url` — 非交互两步式第一步（改用 `--no-wait` + `--device-code`）
 - `--method` — 授权方式选择（Device Flow 是唯一方式）
 - `--scopes` — 请求 OAuth scope（飞书 token v2 端点实际忽略此参数，返回应用预配置的全部 scope）
 
@@ -254,8 +254,6 @@ feishu-cli auth check --scope "search:docs:read im:message:readonly"
 
 退出码 0 = 满足，非 0 = 缺少或未登录，AI Agent 可直接分支。
 
-参考官方 lark-cli 的 `auth check` 实现（`cli/cmd/auth/check.go`）。
-
 ### 不变
 
 - **Token 存储格式**：`~/.feishu-cli/token.json` 仍是明文 JSON，数据结构完全兼容。升级后**不需要重新登录**
@@ -294,7 +292,7 @@ feishu-cli auth login --json
 # 等后台进程退出，读第二行 stdout 拿 authorization_success
 ```
 
-**方案 B**：对齐官方 lark-cli 的两步模式：
+**方案 B**：两步模式：
 ```bash
 # 第一步
 feishu-cli auth login --no-wait --json  # → device_code JSON

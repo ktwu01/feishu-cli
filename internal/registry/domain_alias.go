@@ -17,12 +17,11 @@ var compositeDomains = map[string][]string{
 	"doc_access": {"wiki"},
 }
 
-// extraDomainScopes mirrors the official CLI's shortcuts system.
-// Each entry contains ONLY the base Scopes (or UserScopes for user identity)
-// declared by each shortcut in the official shortcuts/ directory.
-// Per-flag conditional scopes are NOT included — matching official collectScopesForDomains behavior.
-//
-// Source: ~/airepo/cli/shortcuts/<domain>/*.go
+// extraDomainScopes maps each business domain to the minimum set of scopes
+// needed by its commands. Each entry contains ONLY the base scopes (or
+// user-identity scopes) that every command in the domain requires — per-flag
+// conditional scopes are NOT included (callers should add those on top when
+// relevant flags are used).
 var extraDomainScopes = map[string][]string{
 	// --- Domains absent from meta_data.json (fallback-only) ---
 
@@ -140,7 +139,7 @@ var extraDomainScopes = map[string][]string{
 		"docs:document:export", "drive:file:download",
 	},
 
-	// approval: no shortcuts in official, but feishu-cli needs approval:task for user-token queries
+	// approval: approval:task is needed for user-token approval task queries
 	"approval": {
 		"approval:task",
 	},

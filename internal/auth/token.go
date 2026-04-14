@@ -105,7 +105,7 @@ func clearCurrentUserCacheBestEffort() {
 	_ = DeleteCurrentUserCache()
 }
 
-// tokenRefreshAhead 是 token 过期前主动刷新的时间窗口，对齐官方 lark-cli 的 refreshAheadMs（5 分钟）。
+// tokenRefreshAhead 是 token 过期前主动刷新的时间窗口（5 分钟）。
 // 窗口过小会让运行时间较长的命令（如大文档导入、长时间搜索）在执行途中遇到 token 过期。
 const tokenRefreshAhead = 5 * time.Minute
 

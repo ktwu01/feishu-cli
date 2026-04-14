@@ -152,7 +152,7 @@ func ImportDiagram(whiteboardID string, source string, opts ImportDiagramOptions
 		diagramType = 0 // auto
 	}
 
-	// Build request body - use field names that match lark-cli
+	// Build request body for Feishu board PlantUML/Mermaid import endpoint
 	reqBody := map[string]any{
 		"plant_uml_code": content,
 		"syntax_type":    syntaxType,

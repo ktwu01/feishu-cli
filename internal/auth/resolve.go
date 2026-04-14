@@ -43,7 +43,7 @@ func ResolveUserAccessToken(flagValue, configValue, appID, appSecret, baseURL st
 				baseURL = "https://open.feishu.cn"
 			}
 			logf("[自动刷新] Access Token 已过期，正在刷新...")
-			newToken, refreshErr := RefreshAccessToken(token.RefreshToken, appID, appSecret, baseURL)
+			newToken, refreshErr := RefreshAccessToken(token, appID, appSecret, baseURL)
 			if refreshErr != nil {
 				logf("[自动刷新] 刷新失败: %v", refreshErr)
 			} else {

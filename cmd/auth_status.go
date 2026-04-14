@@ -61,23 +61,42 @@ var authStatusCmd = &cobra.Command{
 			note = "User Token 已过期，仅剩应用身份可用"
 		}
 
+		refreshPresent := token.RefreshToken != ""
+		// health 区分三种情况：
+		//   healthy              — access_token 或 refresh_token 当前有效
+		//   missing_refresh_token — 登录时就没拿到 refresh_token（常因应用未开通 offline_access）
+		//   needs_relogin        — 曾经有 refresh_token 但已过期，或 access_token 也已失效
+		health := "healthy"
+		if !refreshPresent {
+			health = "missing_refresh_token"
+			if note == "" {
+				note = "登录时未获取到 refresh_token，Access Token 过期后需重新 auth login；常因应用未开通 offline_access scope"
+			}
+		} else if status == "expired" {
+			health = "needs_relogin"
+		}
+
 		result := map[string]any{
-			"logged_in":          true,
-			"identity":           identity,
-			"token_status":       status,
-			"access_token":       auth.MaskToken(token.AccessToken),
-			"scope":              token.Scope,
-			"expires_at":         token.ExpiresAt.Format("2006-01-02T15:04:05+08:00"),
-			"access_token_valid": token.IsAccessTokenValid(),
+			"logged_in":             true,
+			"identity":              identity,
+			"token_status":          status,
+			"access_token":          auth.MaskToken(token.AccessToken),
+			"scope":                 token.Scope,
+			"expires_at":            token.ExpiresAt.Format("2006-01-02T15:04:05+08:00"),
+			"access_token_valid":    token.IsAccessTokenValid(),
+			"refresh_token_present": refreshPresent,
+			"health":                health,
 		}
 		if note != "" {
 			result["note"] = note
 		}
-		if token.RefreshToken != "" {
+		if refreshPresent {
 			result["refresh_token_valid"] = token.IsRefreshTokenValid()
 			if !token.RefreshExpiresAt.IsZero() {
 				result["refresh_expires_at"] = token.RefreshExpiresAt.Format("2006-01-02T15:04:05+08:00")
 			}
+		} else {
+			result["refresh_token_valid"] = false
 		}
 		if cache, cacheErr := auth.LoadCurrentUserCache(); cacheErr == nil && cache != nil {
 			result["cached_user"] = map[string]any{
@@ -114,7 +133,7 @@ var authStatusCmd = &cobra.Command{
 			fmt.Printf("  有效期至:        %s（已过期）\n", token.ExpiresAt.Format("2006-01-02 15:04:05"))
 		}
 
-		if token.RefreshToken != "" {
+		if refreshPresent {
 			if token.IsRefreshTokenValid() {
 				if token.RefreshExpiresAt.IsZero() {
 					fmt.Println("  Refresh Token:  有效（过期时间未知）")
@@ -125,6 +144,8 @@ var authStatusCmd = &cobra.Command{
 			} else {
 				fmt.Println("  Refresh Token:  已过期")
 			}
+		} else {
+			fmt.Println("  Refresh Token:  ⚠ 未获取（登录时应用可能未开通 offline_access）")
 		}
 
 		if token.Scope != "" {
@@ -133,6 +154,7 @@ var authStatusCmd = &cobra.Command{
 		if cache, ok := result["cached_user"].(map[string]any); ok {
 			fmt.Printf("  当前用户:        %s (%s)\n", cache["name"], cache["open_id"])
 		}
+		fmt.Printf("  健康度:          %s\n", health)
 		if note != "" {
 			fmt.Printf("  提示:            %s\n", note)
 		}
@@ -184,7 +206,7 @@ func verifyStoredUserToken(token *auth.TokenStore) (bool, string) {
 			return false, "access_token 和 refresh_token 都已过期"
 		}
 		cfg := config.Get()
-		fresh, err := auth.RefreshAccessToken(token.RefreshToken, cfg.AppID, cfg.AppSecret, cfg.BaseURL)
+		fresh, err := auth.RefreshAccessToken(token, cfg.AppID, cfg.AppSecret, cfg.BaseURL)
 		if err != nil {
 			return false, err.Error()
 		}
