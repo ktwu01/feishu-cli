@@ -39,8 +39,9 @@ var getBoardImageCmd = &cobra.Command{
 		whiteboardID := args[0]
 		outputPath := args[1]
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		err := client.GetBoardImage(whiteboardID, outputPath)
+		err := client.GetBoardImage(whiteboardID, outputPath, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -67,4 +68,5 @@ var getBoardImageCmd = &cobra.Command{
 func init() {
 	boardCmd.AddCommand(getBoardImageCmd)
 	getBoardImageCmd.Flags().StringP("output", "o", "", "输出格式 (json)")
+	getBoardImageCmd.Flags().String("user-access-token", "", "User Access Token")
 }

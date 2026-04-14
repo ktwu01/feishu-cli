@@ -21,8 +21,8 @@ const maxDownloadSize = 100 * 1024 * 1024
 const downloadTimeout = 5 * time.Minute
 
 // UploadMedia uploads a file to Feishu drive
-func UploadMedia(filePath string, parentType string, parentNode string, fileName string) (string, http.Header, error) {
-	return UploadMediaWithExtra(filePath, parentType, parentNode, fileName, "")
+func UploadMedia(filePath string, parentType string, parentNode string, fileName string, userAccessToken ...string) (string, http.Header, error) {
+	return UploadMediaWithExtra(filePath, parentType, parentNode, fileName, "", firstString(userAccessToken))
 }
 
 // UploadMediaForImport 通过 medias/upload_all 上传临时媒体用于 drive import
@@ -84,7 +84,7 @@ func UploadMediaForImport(filePath, fileName, objType, fileExtension, userAccess
 
 // UploadMediaWithExtra uploads a file to Feishu drive with extra parameter.
 // extra 为 JSON 字符串，用于指定扩展信息（如 {"drive_route_token":"documentID"}）。
-func UploadMediaWithExtra(filePath, parentType, parentNode, fileName, extra string) (string, http.Header, error) {
+func UploadMediaWithExtra(filePath, parentType, parentNode, fileName, extra string, userAccessToken ...string) (string, http.Header, error) {
 	client, err := GetClient()
 	if err != nil {
 		return "", nil, err
@@ -121,7 +121,7 @@ func UploadMediaWithExtra(filePath, parentType, parentNode, fileName, extra stri
 		Body(bodyBuilder.Build()).
 		Build()
 
-	resp, err := client.Drive.Media.UploadAll(Context(), req)
+	resp, err := client.Drive.Media.UploadAll(Context(), req, UserTokenOption(firstString(userAccessToken))...)
 	if err != nil {
 		return "", nil, fmt.Errorf("上传素材失败: %w", err)
 	}
@@ -299,7 +299,7 @@ type DriveFile struct {
 }
 
 // ListFiles 列出文件夹中的文件
-func ListFiles(folderToken string, pageSize int, pageToken string) ([]*DriveFile, string, bool, error) {
+func ListFiles(folderToken string, pageSize int, pageToken string, userAccessToken ...string) ([]*DriveFile, string, bool, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, "", false, err
@@ -316,7 +316,7 @@ func ListFiles(folderToken string, pageSize int, pageToken string) ([]*DriveFile
 		reqBuilder.PageToken(pageToken)
 	}
 
-	resp, err := client.Drive.File.List(Context(), reqBuilder.Build())
+	resp, err := client.Drive.File.List(Context(), reqBuilder.Build(), UserTokenOption(firstString(userAccessToken))...)
 	if err != nil {
 		return nil, "", false, fmt.Errorf("获取文件列表失败: %w", err)
 	}
@@ -352,7 +352,7 @@ func ListFiles(folderToken string, pageSize int, pageToken string) ([]*DriveFile
 }
 
 // CreateFolder 创建文件夹
-func CreateFolder(name string, folderToken string) (string, string, error) {
+func CreateFolder(name string, folderToken string, userAccessToken ...string) (string, string, error) {
 	client, err := GetClient()
 	if err != nil {
 		return "", "", err
@@ -365,7 +365,7 @@ func CreateFolder(name string, folderToken string) (string, string, error) {
 			Build()).
 		Build()
 
-	resp, err := client.Drive.File.CreateFolder(Context(), req)
+	resp, err := client.Drive.File.CreateFolder(Context(), req, UserTokenOption(firstString(userAccessToken))...)
 	if err != nil {
 		return "", "", fmt.Errorf("创建文件夹失败: %w", err)
 	}
@@ -421,7 +421,7 @@ func MoveFileWithToken(fileToken, targetFolderToken, fileType, userAccessToken s
 }
 
 // CopyFile 复制文件
-func CopyFile(fileToken string, targetFolderToken string, name string, fileType string) (string, string, error) {
+func CopyFile(fileToken string, targetFolderToken string, name string, fileType string, userAccessToken ...string) (string, string, error) {
 	client, err := GetClient()
 	if err != nil {
 		return "", "", err
@@ -440,7 +440,7 @@ func CopyFile(fileToken string, targetFolderToken string, name string, fileType 
 		Body(reqBuilder.Build()).
 		Build()
 
-	resp, err := client.Drive.File.Copy(Context(), req)
+	resp, err := client.Drive.File.Copy(Context(), req, UserTokenOption(firstString(userAccessToken))...)
 	if err != nil {
 		return "", "", fmt.Errorf("复制文件失败: %w", err)
 	}
@@ -459,7 +459,7 @@ func CopyFile(fileToken string, targetFolderToken string, name string, fileType 
 }
 
 // DeleteFile 删除文件或文件夹
-func DeleteFile(fileToken string, fileType string) (string, error) {
+func DeleteFile(fileToken string, fileType string, userAccessToken ...string) (string, error) {
 	client, err := GetClient()
 	if err != nil {
 		return "", err
@@ -470,7 +470,7 @@ func DeleteFile(fileToken string, fileType string) (string, error) {
 		Type(fileType).
 		Build()
 
-	resp, err := client.Drive.File.Delete(Context(), req)
+	resp, err := client.Drive.File.Delete(Context(), req, UserTokenOption(firstString(userAccessToken))...)
 	if err != nil {
 		return "", fmt.Errorf("删除文件失败: %w", err)
 	}
@@ -495,7 +495,7 @@ type ShortcutInfo struct {
 }
 
 // CreateShortcut 创建文件快捷方式
-func CreateShortcut(parentToken string, targetFileToken string, targetType string) (*ShortcutInfo, error) {
+func CreateShortcut(parentToken string, targetFileToken string, targetType string, userAccessToken ...string) (*ShortcutInfo, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, err
@@ -511,7 +511,7 @@ func CreateShortcut(parentToken string, targetFileToken string, targetType strin
 			Build()).
 		Build()
 
-	resp, err := client.Drive.File.CreateShortcut(Context(), req)
+	resp, err := client.Drive.File.CreateShortcut(Context(), req, UserTokenOption(firstString(userAccessToken))...)
 	if err != nil {
 		return nil, fmt.Errorf("创建快捷方式失败: %w", err)
 	}
@@ -801,7 +801,7 @@ func versionToInfo(v *larkdrive.Version) *FileVersionInfo {
 }
 
 // CreateFileVersion 创建文件版本
-func CreateFileVersion(fileToken, objType, name string) (*FileVersionInfo, error) {
+func CreateFileVersion(fileToken, objType, name string, userAccessToken ...string) (*FileVersionInfo, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, err
@@ -817,7 +817,7 @@ func CreateFileVersion(fileToken, objType, name string) (*FileVersionInfo, error
 		Version(version).
 		Build()
 
-	resp, err := client.Drive.FileVersion.Create(Context(), req)
+	resp, err := client.Drive.FileVersion.Create(Context(), req, UserTokenOption(firstString(userAccessToken))...)
 	if err != nil {
 		return nil, fmt.Errorf("创建文件版本失败: %w", err)
 	}
@@ -843,7 +843,7 @@ func CreateFileVersion(fileToken, objType, name string) (*FileVersionInfo, error
 }
 
 // GetFileVersion 获取文件版本详情
-func GetFileVersion(fileToken, versionID, objType string) (*FileVersionInfo, error) {
+func GetFileVersion(fileToken, versionID, objType string, userAccessToken ...string) (*FileVersionInfo, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, err
@@ -855,7 +855,7 @@ func GetFileVersion(fileToken, versionID, objType string) (*FileVersionInfo, err
 		ObjType(objType).
 		Build()
 
-	resp, err := client.Drive.FileVersion.Get(Context(), req)
+	resp, err := client.Drive.FileVersion.Get(Context(), req, UserTokenOption(firstString(userAccessToken))...)
 	if err != nil {
 		return nil, fmt.Errorf("获取文件版本失败: %w", err)
 	}
@@ -881,7 +881,7 @@ func GetFileVersion(fileToken, versionID, objType string) (*FileVersionInfo, err
 }
 
 // ListFileVersions 列出文件版本
-func ListFileVersions(fileToken, objType string, pageSize int, pageToken string) ([]*FileVersionInfo, string, bool, error) {
+func ListFileVersions(fileToken, objType string, pageSize int, pageToken string, userAccessToken ...string) ([]*FileVersionInfo, string, bool, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, "", false, err
@@ -898,7 +898,7 @@ func ListFileVersions(fileToken, objType string, pageSize int, pageToken string)
 		reqBuilder.PageToken(pageToken)
 	}
 
-	resp, err := client.Drive.FileVersion.List(Context(), reqBuilder.Build())
+	resp, err := client.Drive.FileVersion.List(Context(), reqBuilder.Build(), UserTokenOption(firstString(userAccessToken))...)
 	if err != nil {
 		return nil, "", false, fmt.Errorf("获取文件版本列表失败: %w", err)
 	}
@@ -925,7 +925,7 @@ func ListFileVersions(fileToken, objType string, pageSize int, pageToken string)
 }
 
 // DeleteFileVersion 删除文件版本
-func DeleteFileVersion(fileToken, versionID, objType string) error {
+func DeleteFileVersion(fileToken, versionID, objType string, userAccessToken ...string) error {
 	client, err := GetClient()
 	if err != nil {
 		return err
@@ -937,7 +937,7 @@ func DeleteFileVersion(fileToken, versionID, objType string) error {
 		ObjType(objType).
 		Build()
 
-	resp, err := client.Drive.FileVersion.Delete(Context(), req)
+	resp, err := client.Drive.FileVersion.Delete(Context(), req, UserTokenOption(firstString(userAccessToken))...)
 	if err != nil {
 		return fmt.Errorf("删除文件版本失败: %w", err)
 	}
@@ -962,7 +962,7 @@ type FileMeta struct {
 }
 
 // BatchGetMeta 批量获取文件元数据
-func BatchGetMeta(docTokens []string, docType string) ([]*FileMeta, error) {
+func BatchGetMeta(docTokens []string, docType string, userAccessToken ...string) ([]*FileMeta, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, err
@@ -986,7 +986,7 @@ func BatchGetMeta(docTokens []string, docType string) ([]*FileMeta, error) {
 		MetaRequest(metaRequest).
 		Build()
 
-	resp, err := client.Drive.Meta.BatchQuery(Context(), req)
+	resp, err := client.Drive.Meta.BatchQuery(Context(), req, UserTokenOption(firstString(userAccessToken))...)
 	if err != nil {
 		return nil, fmt.Errorf("批量获取文件元数据失败: %w", err)
 	}
@@ -1027,7 +1027,7 @@ type FileStats struct {
 }
 
 // GetFileStatistics 获取文件统计信息
-func GetFileStatistics(fileToken, fileType string) (*FileStats, error) {
+func GetFileStatistics(fileToken, fileType string, userAccessToken ...string) (*FileStats, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, err
@@ -1038,7 +1038,7 @@ func GetFileStatistics(fileToken, fileType string) (*FileStats, error) {
 		FileType(fileType).
 		Build()
 
-	resp, err := client.Drive.FileStatistics.Get(Context(), req)
+	resp, err := client.Drive.FileStatistics.Get(Context(), req, UserTokenOption(firstString(userAccessToken))...)
 	if err != nil {
 		return nil, fmt.Errorf("获取文件统计信息失败: %w", err)
 	}

@@ -62,6 +62,7 @@ var addContentCmd = &cobra.Command{
 		index, _ := cmd.Flags().GetInt("index")
 		uploadImages, _ := cmd.Flags().GetBool("upload-images")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		// Get source from args or flags
 		var source string
@@ -103,7 +104,7 @@ var addContentCmd = &cobra.Command{
 		}
 
 		if contentType == "markdown" {
-			return addContentMarkdown(documentID, blockID, contentData, basePath, uploadImages, index, output)
+			return addContentMarkdown(documentID, blockID, contentData, basePath, uploadImages, index, output, userAccessToken)
 		}
 
 		// JSON 模式
@@ -115,7 +116,7 @@ var addContentCmd = &cobra.Command{
 			return fmt.Errorf("没有内容可添加")
 		}
 
-		createdBlocks, _, err := client.CreateBlock(documentID, blockID, blocks, index)
+		createdBlocks, _, err := client.CreateBlock(documentID, blockID, blocks, index, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -178,7 +179,7 @@ func deleteContainerAutoEmptyBlock(documentID, parentID, blockTypeName string) {
 }
 
 // addContentMarkdown 处理 Markdown 模式的内容添加，支持嵌套结构、分批创建、表格 429 重试
-func addContentMarkdown(documentID, blockID, contentData, basePath string, uploadImages bool, index int, output string) error {
+func addContentMarkdown(documentID, blockID, contentData, basePath string, uploadImages bool, index int, output, userAccessToken string) error {
 	opts := converter.ConvertOptions{
 		DocumentID:   documentID,
 		UploadImages: uploadImages,
@@ -225,7 +226,7 @@ func addContentMarkdown(documentID, blockID, contentData, basePath string, uploa
 		}
 		batch := topLevelBlocks[i:end]
 
-		createdBlocks, _, err := client.CreateBlock(documentID, blockID, batch, currentIndex)
+		createdBlocks, _, err := client.CreateBlock(documentID, blockID, batch, currentIndex, userAccessToken)
 		if err != nil {
 			return fmt.Errorf("添加内容失败: %w", err)
 		}
@@ -247,7 +248,7 @@ func addContentMarkdown(documentID, blockID, contentData, basePath string, uploa
 	for idx, children := range nodeChildrenMap {
 		if idx < len(createdBlockIDs) {
 			parentID := createdBlockIDs[idx]
-			nestedCount, nestedErr := createNestedChildren(documentID, parentID, children)
+			nestedCount, nestedErr := createNestedChildren(documentID, parentID, children, userAccessToken)
 			if nestedErr != nil {
 				fmt.Fprintf(os.Stderr, "[Warning] 嵌套子块创建失败: %v\n", nestedErr)
 			}
@@ -291,7 +292,7 @@ func addContentMarkdown(documentID, blockID, contentData, basePath string, uploa
 			td := result.TableDatas[tableDataIdx]
 			tableDataIdx++
 
-			if fillTableWithRetry(documentID, tableBlockID, td) {
+			if fillTableWithRetry(documentID, tableBlockID, td, userAccessToken) {
 				tableSuccess++
 			} else {
 				tableFailed++
@@ -319,20 +320,20 @@ func addContentMarkdown(documentID, blockID, contentData, basePath string, uploa
 }
 
 // fillTableWithRetry 填充单个表格内容，带重试（最多 5 次，full jitter 退避）
-func fillTableWithRetry(documentID, tableBlockID string, td *converter.TableData) bool {
+func fillTableWithRetry(documentID, tableBlockID string, td *converter.TableData, userAccessToken string) bool {
 	result := client.DoVoidWithRetry(func() (http.Header, error) {
-		cellIDs, err := client.GetTableCellIDs(documentID, tableBlockID)
+		cellIDs, err := client.GetTableCellIDs(documentID, tableBlockID, userAccessToken)
 		if err != nil {
 			return nil, fmt.Errorf("获取单元格失败: %w", err)
 		}
 
 		if len(td.CellElements) > 0 {
-			if err := client.FillTableCellsRich(documentID, cellIDs, td.CellElements, td.CellContents); err != nil {
+			if err := client.FillTableCellsRich(documentID, cellIDs, td.CellElements, td.CellContents, userAccessToken); err != nil {
 				return nil, fmt.Errorf("填充内容失败: %w", err)
 			}
 			return nil, nil
 		}
-		if err := client.FillTableCells(documentID, cellIDs, td.CellContents); err != nil {
+		if err := client.FillTableCells(documentID, cellIDs, td.CellContents, userAccessToken); err != nil {
 			return nil, fmt.Errorf("填充内容失败: %w", err)
 		}
 		return nil, nil
@@ -358,4 +359,5 @@ func init() {
 	addContentCmd.Flags().IntP("index", "i", -1, "插入位置索引 (-1 表示末尾)")
 	addContentCmd.Flags().Bool("upload-images", false, "上传 Markdown 中的本地图片")
 	addContentCmd.Flags().StringP("output", "o", "", "输出格式 (json)")
+	addContentCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文档）")
 }

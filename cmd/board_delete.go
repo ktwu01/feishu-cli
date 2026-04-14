@@ -29,11 +29,12 @@ var boardDeleteCmd = &cobra.Command{
 		nodeIDsStr, _ := cmd.Flags().GetString("node-ids")
 		deleteAll, _ := cmd.Flags().GetBool("all")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		var nodeIDs []string
 		if deleteAll {
 			// 获取所有节点 ID
-			ids, err := extractBoardNodeIDs(whiteboardID)
+			ids, err := extractBoardNodeIDs(whiteboardID, userAccessToken)
 			if err != nil {
 				return fmt.Errorf("获取画板节点失败: %w", err)
 			}
@@ -48,7 +49,7 @@ var boardDeleteCmd = &cobra.Command{
 			return fmt.Errorf("请指定 --node-ids 或 --all")
 		}
 
-		if err := client.DeleteBoardNodes(whiteboardID, nodeIDs); err != nil {
+		if err := client.DeleteBoardNodes(whiteboardID, nodeIDs, userAccessToken); err != nil {
 			return err
 		}
 

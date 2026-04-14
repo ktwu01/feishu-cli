@@ -49,6 +49,7 @@ var importFileCmd = &cobra.Command{
 		docName, _ := cmd.Flags().GetString("name")
 		folderToken, _ := cmd.Flags().GetString("folder")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		if docName == "" {
 			docName = strings.TrimSuffix(filepath.Base(localPath), filepath.Ext(localPath))
@@ -59,7 +60,7 @@ var importFileCmd = &cobra.Command{
 
 		// 上传文件
 		fmt.Printf("正在上传文件...\n")
-		fileToken, err := client.UploadFile(localPath, folderToken, "")
+		fileToken, err := client.UploadFileWithToken(localPath, folderToken, "", userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -67,7 +68,7 @@ var importFileCmd = &cobra.Command{
 
 		// 创建导入任务
 		fmt.Printf("正在创建导入任务...\n")
-		ticket, err := client.CreateImportTask(fileToken, fileExt, docName, targetType, folderToken)
+		ticket, err := client.CreateImportTaskWithToken(fileToken, fileExt, docName, targetType, folderToken, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -75,7 +76,7 @@ var importFileCmd = &cobra.Command{
 
 		// 轮询等待任务完成
 		fmt.Printf("正在等待导入完成...\n")
-		docToken, url, err := client.WaitImportTask(ticket, 60)
+		docToken, url, err := client.WaitImportTask(ticket, 60, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -104,5 +105,6 @@ func init() {
 	importFileCmd.Flags().String("name", "", "文档名称（默认使用文件名）")
 	importFileCmd.Flags().String("folder", "", "目标文件夹 Token")
 	importFileCmd.Flags().StringP("output", "o", "", "输出格式（json）")
+	importFileCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份导入文档）")
 	mustMarkFlagRequired(importFileCmd, "type")
 }

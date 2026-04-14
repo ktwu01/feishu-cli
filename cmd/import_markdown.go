@@ -306,6 +306,7 @@ var importMarkdownCmd = &cobra.Command{
 		tableWorkers, _ := cmd.Flags().GetInt("table-workers")
 		imageWorkers, _ := cmd.Flags().GetInt("image-workers")
 		diagramRetries, _ := cmd.Flags().GetInt("diagram-retries")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		// 向后兼容: 如果用户使用了旧的 --mermaid-workers/--mermaid-retries，覆盖新值
 		if cmd.Flags().Changed("mermaid-workers") {
@@ -371,7 +372,7 @@ var importMarkdownCmd = &cobra.Command{
 				}
 			}
 
-			doc, err := client.CreateDocument(title, folder)
+			doc, err := client.CreateDocument(title, folder, userAccessToken)
 			if err != nil {
 				return fmt.Errorf("创建文档失败: %w", err)
 			}
@@ -396,7 +397,7 @@ var importMarkdownCmd = &cobra.Command{
 		fmt.Println("=== 阶段 1/3: 创建文档块 ===")
 		phase1Start := time.Now()
 
-		dTasks, tTasks, iTasks, err := phase1CreateBlocks(documentID, segments, uploadImages, basePath, stats, verbose)
+		dTasks, tTasks, iTasks, err := phase1CreateBlocks(documentID, segments, uploadImages, basePath, stats, verbose, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -429,7 +430,7 @@ var importMarkdownCmd = &cobra.Command{
 			fmt.Println(phase2Header)
 			phase2Start := time.Now()
 
-			failedDiagrams := phase2ConcurrentProcess(documentID, dTasks, tTasks, iTasks, diagramWorkers, tableWorkers, imageWorkers, diagramRetries, stats, verbose)
+			failedDiagrams := phase2ConcurrentProcess(documentID, dTasks, tTasks, iTasks, diagramWorkers, tableWorkers, imageWorkers, diagramRetries, stats, verbose, userAccessToken)
 
 			stats.phase2Duration = time.Since(phase2Start)
 			imageUploadTotal := stats.imageTotal - stats.imageSkipped
@@ -448,7 +449,7 @@ var importMarkdownCmd = &cobra.Command{
 				fmt.Printf("=== 阶段 3/3: 降级处理 (%d 个) ===\n", len(failedDiagrams))
 				phase3Start := time.Now()
 
-				phase3HandleFallbacks(documentID, failedDiagrams, stats, verbose)
+				phase3HandleFallbacks(documentID, failedDiagrams, stats, verbose, userAccessToken)
 
 				stats.phase3Duration = time.Since(phase3Start)
 				fmt.Printf("[阶段3] 完成 (%.1fs), 降级成功: %d/%d\n\n",
@@ -533,6 +534,7 @@ func phase1CreateBlocks(
 	basePath string,
 	stats *importStats,
 	verbose bool,
+	userAccessToken string,
 ) ([]diagramTask, []tableTask, []imageTask, error) {
 	var dTasks []diagramTask
 	var tTasks []tableTask
@@ -599,7 +601,7 @@ func phase1CreateBlocks(
 				batch := topLevelBlocks[i:end]
 
 				createResult := client.DoWithRetry(func() ([]*larkdocx.Block, http.Header, error) {
-					return client.CreateBlock(documentID, documentID, batch, -1)
+					return client.CreateBlock(documentID, documentID, batch, -1, userAccessToken)
 				}, client.RetryConfig{
 					MaxRetries:       5,
 					RetryOnRateLimit: true,
@@ -619,7 +621,57 @@ func phase1CreateBlocks(
 			// 递归创建嵌套子块（如嵌套列表）
 			for idx, children := range nodeChildrenMap {
 				if idx < len(createdBlockIDs) {
-					nestedCount, nestedErr := createNestedChildren(documentID, createdBlockIDs[idx], children)
+					parentID := createdBlockIDs[idx]
+
+					// Callout / QuoteContainer 容器创建时飞书 API 会自动插入一个 index 0 的空文本子块。
+					// 必须在调用 createNestedChildren 之前删除它，否则 GetBlockChildren 可能因 API
+					// 一致性延迟返回不完整结果，导致自动子块残留、容器顶部出现多余空行。
+					if idx < len(result.BlockNodes) {
+						node := result.BlockNodes[idx]
+						if node.Block.BlockType != nil && (*node.Block.BlockType == int(converter.BlockTypeCallout) || *node.Block.BlockType == int(converter.BlockTypeQuoteContainer)) {
+							blockTypeName := "Callout"
+							if *node.Block.BlockType == int(converter.BlockTypeQuoteContainer) {
+								blockTypeName = "QuoteContainer"
+							}
+							childrenResult := client.DoWithRetry(func() ([]*larkdocx.Block, http.Header, error) {
+								return client.GetBlockChildren(documentID, parentID, userAccessToken)
+							}, client.RetryConfig{
+								MaxRetries:       3,
+								RetryOnRateLimit: true,
+							})
+							if childrenResult.Err == nil && len(childrenResult.Value) > 0 {
+								firstChild := childrenResult.Value[0]
+								if firstChild.BlockType != nil && *firstChild.BlockType == int(converter.BlockTypeText) {
+									// 检查是否为空文本块（无 elements 或所有 TextRun 内容为空）
+									isEmpty := true
+									if firstChild.Text != nil && len(firstChild.Text.Elements) > 0 {
+										for _, elem := range firstChild.Text.Elements {
+											if elem.TextRun != nil && elem.TextRun.Content != nil && *elem.TextRun.Content != "" {
+												isEmpty = false
+												break
+											}
+										}
+									}
+									if isEmpty {
+										delResult := client.DoWithRetry(func() (struct{}, http.Header, error) {
+											headers, err := client.DeleteBlocks(documentID, parentID, 0, 1, userAccessToken)
+											return struct{}{}, headers, err
+										}, client.RetryConfig{
+											MaxRetries:       5,
+											RetryOnRateLimit: true,
+										})
+										if delResult.Err != nil {
+											fmt.Fprintf(os.Stderr, "  ⚠ %s 空子块删除失败 (parent=%s): %v\n", blockTypeName, parentID, delResult.Err)
+										}
+									}
+								}
+							} else if childrenResult.Err != nil && verbose {
+								syncPrintf("  ⚠ %s 子块查询失败 (parent=%s): %v\n", blockTypeName, parentID, childrenResult.Err)
+							}
+						}
+					}
+
+					nestedCount, nestedErr := createNestedChildren(documentID, parentID, children, userAccessToken)
 					if nestedErr != nil {
 						if verbose {
 							syncPrintf("  ⚠ 段落 %d 嵌套子块创建失败: %v\n", segIdx+1, nestedErr)
@@ -701,7 +753,7 @@ func phase1CreateBlocks(
 				},
 			}
 
-			createdBlocks, _, err := client.CreateBlock(documentID, documentID, equationBlocks, -1)
+			createdBlocks, _, err := client.CreateBlock(documentID, documentID, equationBlocks, -1, userAccessToken)
 			if err != nil {
 				if verbose {
 					fmt.Printf("  ⚠ 公式块创建失败: %v\n", err)
@@ -723,7 +775,7 @@ func phase1CreateBlocks(
 
 			// 只创建画板占位块，不导入图表
 			createResult := client.DoWithRetry(func() (*client.AddBoardResult, http.Header, error) {
-				return client.AddBoard(documentID, "", -1)
+				return client.AddBoard(documentID, "", -1, userAccessToken)
 			}, client.RetryConfig{
 				MaxRetries:       5,
 				RetryOnRateLimit: true,
@@ -778,6 +830,7 @@ func phase2ConcurrentProcess(
 	maxRetries int,
 	stats *importStats,
 	verbose bool,
+	userAccessToken string,
 ) []diagramResult {
 	var wg sync.WaitGroup
 	diagramResults := make([]diagramResult, len(dTasks))
@@ -795,7 +848,7 @@ func phase2ConcurrentProcess(
 			diagramSem <- struct{}{}
 			defer func() { <-diagramSem }()
 
-			result := processDiagramTask(t, maxRetries, verbose)
+			result := processDiagramTask(t, maxRetries, verbose, userAccessToken)
 			diagramResults[idx] = result
 
 			stats.mu.Lock()
@@ -816,7 +869,7 @@ func phase2ConcurrentProcess(
 			tableSem <- struct{}{}
 			defer func() { <-tableSem }()
 
-			result := processTableTask(documentID, t, verbose)
+			result := processTableTask(documentID, t, verbose, userAccessToken)
 
 			stats.mu.Lock()
 			if result.success {
@@ -838,7 +891,7 @@ func phase2ConcurrentProcess(
 				imageSem <- struct{}{}
 				defer func() { <-imageSem }()
 
-				result := processImageTask(documentID, t, verbose)
+				result := processImageTask(documentID, t, verbose, userAccessToken)
 
 				stats.mu.Lock()
 				if result.success {
@@ -865,12 +918,13 @@ func phase2ConcurrentProcess(
 }
 
 // processDiagramTask 处理单个图表导入任务（Mermaid/PlantUML），带重试
-func processDiagramTask(task diagramTask, maxRetries int, verbose bool) diagramResult {
+func processDiagramTask(task diagramTask, maxRetries int, verbose bool, userAccessToken string) diagramResult {
 	syntaxLabel := diagramSyntaxLabel(task.syntax)
 
 	opts := client.ImportDiagramOptions{
-		SourceType: "content",
-		Syntax:     task.syntax,
+		SourceType:      "content",
+		Syntax:          task.syntax,
+		UserAccessToken: userAccessToken,
 	}
 
 	result := client.DoWithRetry(func() (*client.ImportDiagramResult, http.Header, error) {
@@ -909,7 +963,7 @@ func processDiagramTask(task diagramTask, maxRetries int, verbose bool) diagramR
 }
 
 // processTableTask 处理单个表格填充任务（带重试）
-func processTableTask(documentID string, task tableTask, verbose bool) tableResult {
+func processTableTask(documentID string, task tableTask, verbose bool, userAccessToken string) tableResult {
 	if verbose {
 		syncPrintf("  [表格 %d] 填充 %d×%d...\n", task.index, task.tableData.Rows, task.tableData.Cols)
 	}
@@ -918,16 +972,16 @@ func processTableTask(documentID string, task tableTask, verbose bool) tableResu
 
 	result := client.DoVoidWithRetry(func() (http.Header, error) {
 		// 获取表格单元格 ID
-		cellIDs, err := client.GetTableCellIDs(documentID, task.tableBlockID)
+		cellIDs, err := client.GetTableCellIDs(documentID, task.tableBlockID, userAccessToken)
 		if err != nil {
 			return nil, err
 		}
 
 		// 填充单元格内容（优先使用富文本元素以保留链接等样式）
 		if len(task.tableData.CellElements) > 0 {
-			return nil, client.FillTableCellsRich(documentID, cellIDs, task.tableData.CellElements, task.tableData.CellContents)
+			return nil, client.FillTableCellsRich(documentID, cellIDs, task.tableData.CellElements, task.tableData.CellContents, userAccessToken)
 		}
-		return nil, client.FillTableCells(documentID, cellIDs, task.tableData.CellContents)
+		return nil, client.FillTableCells(documentID, cellIDs, task.tableData.CellContents, userAccessToken)
 	}, client.RetryConfig{
 		MaxRetries:       maxRetries,
 		RetryOnRateLimit: true,
@@ -953,7 +1007,7 @@ func processTableTask(documentID string, task tableTask, verbose bool) tableResu
 }
 
 // processImageTask 处理单个图片上传任务（三步法）
-func processImageTask(documentID string, task imageTask, verbose bool) imageResult {
+func processImageTask(documentID string, task imageTask, verbose bool, userAccessToken string) imageResult {
 	const maxRetries = 3
 
 	// 解析图片来源
@@ -993,7 +1047,7 @@ func processImageTask(documentID string, task imageTask, verbose bool) imageResu
 	}
 
 	uploadResult := client.DoWithRetry(func() (string, http.Header, error) {
-		return client.UploadMediaWithExtra(localPath, "docx_image", task.imageBlockID, fileName, extra)
+		return client.UploadMediaWithExtra(localPath, "docx_image", task.imageBlockID, fileName, extra, userAccessToken)
 	}, retryCfg)
 
 	if uploadResult.Err != nil {
@@ -1005,7 +1059,7 @@ func processImageTask(documentID string, task imageTask, verbose bool) imageResu
 
 	// 步骤 3: 替换 Image Block 的 token
 	replaceResult := client.DoVoidWithRetry(func() (http.Header, error) {
-		return client.ReplaceImage(documentID, task.imageBlockID, fileToken)
+		return client.ReplaceImage(documentID, task.imageBlockID, fileToken, userAccessToken)
 	}, retryCfg)
 
 	if replaceResult.Err != nil {
@@ -1078,7 +1132,7 @@ func resolveImageSource(source, basePath string) (string, string, func(), error)
 
 // createNestedChildren 递归创建嵌套子块（如嵌套列表的父子关系）
 // 返回创建的块总数和可能的错误
-func createNestedChildren(documentID string, parentBlockID string, children []*converter.BlockNode) (int, error) {
+func createNestedChildren(documentID string, parentBlockID string, children []*converter.BlockNode, userAccessToken string) (int, error) {
 	if len(children) == 0 {
 		return 0, nil
 	}
@@ -1100,7 +1154,7 @@ func createNestedChildren(documentID string, parentBlockID string, children []*c
 		batch := childBlocks[i:end]
 
 		result := client.DoWithRetry(func() ([]*larkdocx.Block, http.Header, error) {
-			return client.CreateBlock(documentID, parentBlockID, batch, -1)
+			return client.CreateBlock(documentID, parentBlockID, batch, -1, userAccessToken)
 		}, client.RetryConfig{
 			MaxRetries:       5,
 			RetryOnRateLimit: true,
@@ -1124,7 +1178,7 @@ func createNestedChildren(documentID string, parentBlockID string, children []*c
 		}
 		childID := createdBlockIDs[i]
 		if len(child.Children) > 0 {
-			nestedCount, err := createNestedChildren(documentID, childID, child.Children)
+			nestedCount, err := createNestedChildren(documentID, childID, child.Children, userAccessToken)
 			totalCreated += nestedCount
 			if err != nil {
 				return totalCreated, err
@@ -1150,9 +1204,10 @@ func phase3HandleFallbacks(
 	failedDiagrams []diagramResult,
 	stats *importStats,
 	verbose bool,
+	userAccessToken string,
 ) {
 	// 获取文档顶层子块列表
-	children, err := client.GetAllBlockChildren(documentID, documentID)
+	children, err := client.GetAllBlockChildren(documentID, documentID, userAccessToken)
 	if err != nil {
 		fmt.Printf("  ✗ 获取文档子块失败，无法降级: %v\n", err)
 		stats.fallbackFailed += len(failedDiagrams)
@@ -1196,7 +1251,7 @@ func phase3HandleFallbacks(
 		}
 
 		// 1. 删除空画板块
-		_, err := client.DeleteBlocks(documentID, documentID, item.index, item.index+1)
+		_, err := client.DeleteBlocks(documentID, documentID, item.index, item.index+1, userAccessToken)
 		if err != nil {
 			fmt.Printf("  ✗ %s %d 删除画板失败: %v\n", syntaxLabel, item.result.task.index, err)
 			stats.fallbackFailed++
@@ -1205,7 +1260,7 @@ func phase3HandleFallbacks(
 
 		// 2. 在同位置插入代码块
 		codeBlock := createDiagramCodeBlock(item.result.task.syntax, item.result.task.content)
-		_, _, err = client.CreateBlock(documentID, documentID, []*larkdocx.Block{codeBlock}, item.index)
+		_, _, err = client.CreateBlock(documentID, documentID, []*larkdocx.Block{codeBlock}, item.index, userAccessToken)
 		if err != nil {
 			fmt.Printf("  ✗ %s %d 插入代码块失败: %v\n", syntaxLabel, item.result.task.index, err)
 			stats.fallbackFailed++
@@ -1255,6 +1310,7 @@ func init() {
 	importMarkdownCmd.Flags().Int("table-workers", 3, "表格并发填充数")
 	importMarkdownCmd.Flags().Int("image-workers", 2, "图片并发上传数 (API 限制 5 QPS)")
 	importMarkdownCmd.Flags().Int("diagram-retries", 10, "图表最大重试次数")
+	importMarkdownCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文档）")
 	// 向后兼容别名
 	importMarkdownCmd.Flags().Int("mermaid-workers", 5, "图表并发导入数 (--diagram-workers 别名)")
 	importMarkdownCmd.Flags().Int("mermaid-retries", 10, "图表最大重试次数 (--diagram-retries 别名)")

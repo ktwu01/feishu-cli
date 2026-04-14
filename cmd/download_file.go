@@ -39,6 +39,7 @@ var downloadFileCmd = &cobra.Command{
 		fileToken := args[0]
 		outputPath, _ := cmd.Flags().GetString("output")
 		timeoutStr, _ := cmd.Flags().GetString("timeout")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		if outputPath == "" {
 			outputPath = fileToken
@@ -53,7 +54,7 @@ var downloadFileCmd = &cobra.Command{
 			}
 		}
 
-		if err := client.DownloadFile(fileToken, outputPath, timeout); err != nil {
+		if err := client.DownloadFileWithToken(fileToken, outputPath, userAccessToken, timeout); err != nil {
 			return err
 		}
 
@@ -69,4 +70,5 @@ func init() {
 	fileCmd.AddCommand(downloadFileCmd)
 	downloadFileCmd.Flags().StringP("output", "o", "", "输出文件路径")
 	downloadFileCmd.Flags().String("timeout", "", "下载超时时间（默认 5m，示例: 10m, 30m, 1h）")
+	downloadFileCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文件）")
 }

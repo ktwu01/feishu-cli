@@ -44,8 +44,9 @@ var copyFileCmd = &cobra.Command{
 		fileType, _ := cmd.Flags().GetString("type")
 		name, _ := cmd.Flags().GetString("name")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		newToken, url, err := client.CopyFile(fileToken, targetFolder, name, fileType)
+		newToken, url, err := client.CopyFile(fileToken, targetFolder, name, fileType, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -75,6 +76,7 @@ func init() {
 	copyFileCmd.Flags().String("target", "", "目标文件夹 Token（必填）")
 	copyFileCmd.Flags().String("type", "", "文件类型（必填）")
 	copyFileCmd.Flags().String("name", "", "新文件名称")
+	copyFileCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文件）")
 	copyFileCmd.Flags().StringP("output", "o", "", "输出格式（json）")
 	mustMarkFlagRequired(copyFileCmd, "target", "type")
 }

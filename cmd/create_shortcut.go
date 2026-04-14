@@ -43,8 +43,9 @@ var createShortcutCmd = &cobra.Command{
 		targetFolder, _ := cmd.Flags().GetString("target")
 		fileType, _ := cmd.Flags().GetString("type")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		info, err := client.CreateShortcut(targetFolder, fileToken, fileType)
+		info, err := client.CreateShortcut(targetFolder, fileToken, fileType, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -71,6 +72,7 @@ func init() {
 	fileCmd.AddCommand(createShortcutCmd)
 	createShortcutCmd.Flags().String("target", "", "目标文件夹 Token（必填）")
 	createShortcutCmd.Flags().String("type", "", "文件类型（必填）")
+	createShortcutCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文件）")
 	createShortcutCmd.Flags().StringP("output", "o", "", "输出格式（json）")
 	mustMarkFlagRequired(createShortcutCmd, "target", "type")
 }

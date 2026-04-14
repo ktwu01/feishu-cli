@@ -23,8 +23,9 @@ var getBoardNodesCmd = &cobra.Command{
 		}
 
 		whiteboardID := args[0]
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		rawJSON, err := client.GetBoardNodes(whiteboardID)
+		rawJSON, err := client.GetBoardNodes(whiteboardID, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -43,4 +44,5 @@ var getBoardNodesCmd = &cobra.Command{
 
 func init() {
 	boardCmd.AddCommand(getBoardNodesCmd)
+	getBoardNodesCmd.Flags().String("user-access-token", "", "User Access Token")
 }

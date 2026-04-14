@@ -64,6 +64,7 @@ var addCalloutCmd = &cobra.Command{
 		calloutType, _ := cmd.Flags().GetString("callout-type")
 		icon, _ := cmd.Flags().GetString("icon")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		// 获取 callout 类型配置
 		bgColor, ok := calloutTypeConfig[calloutType]
@@ -93,7 +94,7 @@ var addCalloutCmd = &cobra.Command{
 		}
 
 		// 创建 callout 块
-		createdBlocks, _, err := client.CreateBlock(documentID, parentID, []*larkdocx.Block{calloutBlock}, index)
+		createdBlocks, _, err := client.CreateBlock(documentID, parentID, []*larkdocx.Block{calloutBlock}, index, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -110,7 +111,7 @@ var addCalloutCmd = &cobra.Command{
 
 		// 飞书 API 创建 Callout 时会自动生成一个空的子文本块，
 		// 直接更新该子块的内容，避免产生多余的空行。
-		children, _, err := client.GetBlockChildren(documentID, calloutBlockID)
+		children, _, err := client.GetBlockChildren(documentID, calloutBlockID, userAccessToken)
 		if err != nil {
 			return fmt.Errorf("获取高亮块子块失败: %w", err)
 		}
@@ -124,7 +125,7 @@ var addCalloutCmd = &cobra.Command{
 					},
 				},
 			}
-			_, err = client.UpdateBlock(documentID, *children[0].BlockId, updateContent)
+			_, err = client.UpdateBlock(documentID, *children[0].BlockId, updateContent, userAccessToken)
 			if err != nil {
 				return fmt.Errorf("更新高亮块内容失败: %w", err)
 			}
@@ -143,7 +144,7 @@ var addCalloutCmd = &cobra.Command{
 					},
 				},
 			}
-			_, _, err = client.CreateBlock(documentID, calloutBlockID, []*larkdocx.Block{textBlock}, 0)
+			_, _, err = client.CreateBlock(documentID, calloutBlockID, []*larkdocx.Block{textBlock}, 0, userAccessToken)
 			if err != nil {
 				return fmt.Errorf("添加高亮块内容失败: %w", err)
 			}
@@ -174,5 +175,6 @@ func init() {
 	addCalloutCmd.Flags().Int("index", -1, "插入位置索引（-1 表示末尾）")
 	addCalloutCmd.Flags().String("callout-type", "info", "高亮块类型 (info/warning/error/success)")
 	addCalloutCmd.Flags().String("icon", "", "自定义图标（emoji shortcode）")
+	addCalloutCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文档）")
 	addCalloutCmd.Flags().StringP("output", "o", "", "输出格式 (json)")
 }

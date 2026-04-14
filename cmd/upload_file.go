@@ -40,8 +40,9 @@ var uploadFileCmd = &cobra.Command{
 		parentToken, _ := cmd.Flags().GetString("parent")
 		fileName, _ := cmd.Flags().GetString("name")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		fileToken, err := client.UploadFile(localPath, parentToken, fileName)
+		fileToken, err := client.UploadFileWithToken(localPath, parentToken, fileName, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -70,5 +71,6 @@ func init() {
 	fileCmd.AddCommand(uploadFileCmd)
 	uploadFileCmd.Flags().String("parent", "", "父文件夹 Token（默认根目录）")
 	uploadFileCmd.Flags().String("name", "", "文件名（默认使用本地文件名）")
+	uploadFileCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文件）")
 	uploadFileCmd.Flags().StringP("output", "o", "", "输出格式（json）")
 }

@@ -39,6 +39,7 @@ var boardUpdateCmd = &cobra.Command{
 		overwrite, _ := cmd.Flags().GetBool("overwrite")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		// 1. 读取节点 JSON（从文件或 stdin）
 		var nodesJSON string
@@ -60,7 +61,7 @@ var boardUpdateCmd = &cobra.Command{
 
 		// 2. dry-run 模式：只统计旧节点数
 		if dryRun && overwrite {
-			ids, err := extractBoardNodeIDs(whiteboardID)
+			ids, err := extractBoardNodeIDs(whiteboardID, userAccessToken)
 			if err != nil {
 				return fmt.Errorf("获取画板节点失败: %w", err)
 			}
@@ -72,7 +73,7 @@ var boardUpdateCmd = &cobra.Command{
 		// 3. 如果 overwrite，先获取旧节点 ID 列表
 		var oldNodeIDs []string
 		if overwrite {
-			ids, err := extractBoardNodeIDs(whiteboardID)
+			ids, err := extractBoardNodeIDs(whiteboardID, userAccessToken)
 			if err != nil {
 				return fmt.Errorf("获取旧节点失败: %w", err)
 			}
@@ -80,7 +81,9 @@ var boardUpdateCmd = &cobra.Command{
 		}
 
 		// 4. 创建新节点
-		newNodeIDs, err := client.CreateBoardNodes(whiteboardID, nodesJSON, client.CreateBoardNotesOptions{})
+		newNodeIDs, err := client.CreateBoardNodes(whiteboardID, nodesJSON, client.CreateBoardNotesOptions{
+			UserAccessToken: userAccessToken,
+		})
 		if err != nil {
 			return fmt.Errorf("创建节点失败: %w", err)
 		}
@@ -104,7 +107,7 @@ var boardUpdateCmd = &cobra.Command{
 			}
 
 			if len(toDelete) > 0 {
-				if err := client.DeleteBoardNodes(whiteboardID, toDelete); err != nil {
+				if err := client.DeleteBoardNodes(whiteboardID, toDelete, userAccessToken); err != nil {
 					fmt.Fprintf(os.Stderr, "警告: 删除旧节点失败: %v\n", err)
 				} else {
 					deletedCount = len(toDelete)
@@ -141,8 +144,8 @@ var boardUpdateCmd = &cobra.Command{
 }
 
 // extractBoardNodeIDs 从画板获取所有节点 ID
-func extractBoardNodeIDs(whiteboardID string) ([]string, error) {
-	rawJSON, err := client.GetBoardNodes(whiteboardID)
+func extractBoardNodeIDs(whiteboardID, userAccessToken string) ([]string, error) {
+	rawJSON, err := client.GetBoardNodes(whiteboardID, userAccessToken)
 	if err != nil {
 		return nil, err
 	}

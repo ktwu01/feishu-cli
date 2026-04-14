@@ -43,6 +43,7 @@ var addBoardCmd = &cobra.Command{
 		parentID, _ := cmd.Flags().GetString("parent-id")
 		index, _ := cmd.Flags().GetInt("index")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		// 如果父块 ID 为空，使用文档根节点
 		if parentID == "" {
@@ -57,7 +58,7 @@ var addBoardCmd = &cobra.Command{
 		}
 
 		// 创建画板块
-		createdBlocks, _, err := client.CreateBlock(documentID, parentID, []*larkdocx.Block{boardBlock}, index)
+		createdBlocks, _, err := client.CreateBlock(documentID, parentID, []*larkdocx.Block{boardBlock}, index, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -101,5 +102,6 @@ func init() {
 	docCmd.AddCommand(addBoardCmd)
 	addBoardCmd.Flags().String("parent-id", "", "父块 ID（默认: 文档根节点）")
 	addBoardCmd.Flags().Int("index", -1, "插入位置索引（-1 表示末尾）")
+	addBoardCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文档）")
 	addBoardCmd.Flags().StringP("output", "o", "", "输出格式 (json)")
 }

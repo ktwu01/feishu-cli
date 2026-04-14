@@ -59,8 +59,9 @@ var listVersionCmd = &cobra.Command{
 		objType, _ := cmd.Flags().GetString("obj-type")
 		pageSize, _ := cmd.Flags().GetInt("page-size")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		versions, _, _, err := client.ListFileVersions(fileToken, objType, pageSize, "")
+		versions, _, _, err := client.ListFileVersions(fileToken, objType, pageSize, "", userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -110,8 +111,9 @@ var createVersionCmd = &cobra.Command{
 		objType, _ := cmd.Flags().GetString("obj-type")
 		name, _ := cmd.Flags().GetString("name")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		version, err := client.CreateFileVersion(fileToken, objType, name)
+		version, err := client.CreateFileVersion(fileToken, objType, name, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -152,8 +154,9 @@ var getVersionCmd = &cobra.Command{
 		versionID := args[1]
 		objType, _ := cmd.Flags().GetString("obj-type")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		version, err := client.GetFileVersion(fileToken, versionID, objType)
+		version, err := client.GetFileVersion(fileToken, versionID, objType, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -202,8 +205,9 @@ var deleteVersionCmd = &cobra.Command{
 		fileToken := args[0]
 		versionID := args[1]
 		objType, _ := cmd.Flags().GetString("obj-type")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		if err := client.DeleteFileVersion(fileToken, versionID, objType); err != nil {
+		if err := client.DeleteFileVersion(fileToken, versionID, objType, userAccessToken); err != nil {
 			return err
 		}
 
@@ -217,6 +221,7 @@ var deleteVersionCmd = &cobra.Command{
 
 func init() {
 	fileCmd.AddCommand(versionCmd)
+	versionCmd.PersistentFlags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文件）")
 
 	// list 子命令
 	versionCmd.AddCommand(listVersionCmd)

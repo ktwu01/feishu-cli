@@ -38,8 +38,10 @@ var deleteWikiNodeCmd = &cobra.Command{
 		}
 		force, _ := cmd.Flags().GetBool("force")
 
+		token := resolveOptionalUserToken(cmd)
+
 		// 先获取节点信息以获取 obj_token 和 obj_type
-		node, err := client.GetWikiNode(nodeToken, resolveOptionalUserToken(cmd))
+		node, err := client.GetWikiNode(nodeToken, token)
 		if err != nil {
 			return fmt.Errorf("获取节点信息失败: %w", err)
 		}
@@ -53,7 +55,7 @@ var deleteWikiNodeCmd = &cobra.Command{
 		}
 
 		// 通过 Drive API 删除对应的文档
-		taskID, err := client.DeleteFile(node.ObjToken, node.ObjType)
+		taskID, err := client.DeleteFile(node.ObjToken, node.ObjType, token)
 		if err != nil {
 			return err
 		}

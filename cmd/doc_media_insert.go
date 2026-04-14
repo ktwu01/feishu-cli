@@ -47,6 +47,7 @@ var docMediaInsertCmd = &cobra.Command{
 		alignStr, _ := cmd.Flags().GetString("align")
 		caption, _ := cmd.Flags().GetString("caption")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		// 确定块类型和上传 parent_type
 		var blockType int
@@ -70,7 +71,7 @@ var docMediaInsertCmd = &cobra.Command{
 		}
 
 		// ===== 步骤 1：获取文档根块信息 =====
-		rootBlock, err := client.GetBlock(documentID, documentID)
+		rootBlock, err := client.GetBlock(documentID, documentID, userAccessToken)
 		if err != nil {
 			return fmt.Errorf("步骤 1 失败 - 获取文档根块: %w", err)
 		}
@@ -93,7 +94,7 @@ var docMediaInsertCmd = &cobra.Command{
 				BlockType: &blockType,
 				File:      &larkdocx.File{Token: &emptyToken},
 			}
-			createdBlocks, _, createErr := client.CreateBlock(documentID, documentID, []*larkdocx.Block{newBlock}, insertIndex)
+			createdBlocks, _, createErr := client.CreateBlock(documentID, documentID, []*larkdocx.Block{newBlock}, insertIndex, userAccessToken)
 			if createErr != nil {
 				return fmt.Errorf("步骤 2 失败 - 创建空文件块: %w", createErr)
 			}
@@ -114,9 +115,9 @@ var docMediaInsertCmd = &cobra.Command{
 			// 步骤 3：上传文件到 Drive，使用 File Block ID 作为 parent_node
 			extra := fmt.Sprintf(`{"drive_route_token":"%s"}`, documentID)
 			fileName := filepath.Base(filePath)
-			fileToken, _, err = client.UploadMediaWithExtra(filePath, parentType, fileBlockID, fileName, extra)
+			fileToken, _, err = client.UploadMediaWithExtra(filePath, parentType, fileBlockID, fileName, extra, userAccessToken)
 			if err != nil {
-				rollbackErr := rollbackInsertedBlock(documentID, insertIndex)
+				rollbackErr := rollbackInsertedBlock(documentID, insertIndex, userAccessToken)
 				if rollbackErr != nil {
 					return fmt.Errorf("步骤 3 失败 - 上传文件: %w（回滚失败: %v）", err, rollbackErr)
 				}
@@ -128,9 +129,9 @@ var docMediaInsertCmd = &cobra.Command{
 				"replace_file": map[string]any{
 					"token": fileToken,
 				},
-			})
+			}, userAccessToken)
 			if err != nil {
-				rollbackErr := rollbackInsertedBlock(documentID, insertIndex)
+				rollbackErr := rollbackInsertedBlock(documentID, insertIndex, userAccessToken)
 				if rollbackErr != nil {
 					return fmt.Errorf("步骤 4 失败 - 绑定文件: %w（回滚失败: %v）", err, rollbackErr)
 				}
@@ -144,7 +145,7 @@ var docMediaInsertCmd = &cobra.Command{
 				BlockType: &blockType,
 				Image:     &larkdocx.Image{},
 			}
-			createdBlocks, _, createErr := client.CreateBlock(documentID, documentID, []*larkdocx.Block{newBlock}, insertIndex)
+			createdBlocks, _, createErr := client.CreateBlock(documentID, documentID, []*larkdocx.Block{newBlock}, insertIndex, userAccessToken)
 			if createErr != nil {
 				return fmt.Errorf("步骤 2 失败 - 创建空块: %w", createErr)
 			}
@@ -156,9 +157,9 @@ var docMediaInsertCmd = &cobra.Command{
 			// 步骤 3：上传文件到 Drive
 			extra := fmt.Sprintf(`{"drive_route_token":"%s"}`, documentID)
 			fileName := filepath.Base(filePath)
-			fileToken, _, err = client.UploadMediaWithExtra(filePath, parentType, newBlockID, fileName, extra)
+			fileToken, _, err = client.UploadMediaWithExtra(filePath, parentType, newBlockID, fileName, extra, userAccessToken)
 			if err != nil {
-				rollbackErr := rollbackInsertedBlock(documentID, insertIndex)
+				rollbackErr := rollbackInsertedBlock(documentID, insertIndex, userAccessToken)
 				if rollbackErr != nil {
 					return fmt.Errorf("步骤 3 失败 - 上传文件: %w（回滚失败: %v）", err, rollbackErr)
 				}
@@ -175,9 +176,9 @@ var docMediaInsertCmd = &cobra.Command{
 			}
 			_, err = client.UpdateBlock(documentID, newBlockID, map[string]any{
 				"replace_image": replaceReq,
-			})
+			}, userAccessToken)
 			if err != nil {
-				rollbackErr := rollbackInsertedBlock(documentID, insertIndex)
+				rollbackErr := rollbackInsertedBlock(documentID, insertIndex, userAccessToken)
 				if rollbackErr != nil {
 					return fmt.Errorf("步骤 4 失败 - 绑定图片: %w（回滚失败: %v）", err, rollbackErr)
 				}
@@ -210,8 +211,8 @@ var docMediaInsertCmd = &cobra.Command{
 }
 
 // rollbackInsertedBlock 回滚创建的空块
-func rollbackInsertedBlock(documentID string, blockIndex int) error {
-	_, err := client.DeleteBlocks(documentID, documentID, blockIndex, blockIndex+1)
+func rollbackInsertedBlock(documentID string, blockIndex int, userAccessToken string) error {
+	_, err := client.DeleteBlocks(documentID, documentID, blockIndex, blockIndex+1, userAccessToken)
 	return err
 }
 

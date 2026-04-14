@@ -42,8 +42,9 @@ var moveFileCmd = &cobra.Command{
 		fileToken := args[0]
 		targetFolder, _ := cmd.Flags().GetString("target")
 		fileType, _ := cmd.Flags().GetString("type")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		taskID, err := client.MoveFile(fileToken, targetFolder, fileType)
+		taskID, err := client.MoveFileWithToken(fileToken, targetFolder, fileType, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -63,5 +64,6 @@ func init() {
 	fileCmd.AddCommand(moveFileCmd)
 	moveFileCmd.Flags().String("target", "", "目标文件夹 Token（必填）")
 	moveFileCmd.Flags().String("type", "", "文件类型（必填）")
+	moveFileCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文件）")
 	mustMarkFlagRequired(moveFileCmd, "target", "type")
 }

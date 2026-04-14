@@ -41,8 +41,9 @@ var fileMetaCmd = &cobra.Command{
 
 		docType, _ := cmd.Flags().GetString("doc-type")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		metas, err := client.BatchGetMeta(args, docType)
+		metas, err := client.BatchGetMeta(args, docType, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -83,6 +84,7 @@ var fileMetaCmd = &cobra.Command{
 func init() {
 	fileCmd.AddCommand(fileMetaCmd)
 	fileMetaCmd.Flags().String("doc-type", "", "文件类型（必填）")
+	fileMetaCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文件）")
 	fileMetaCmd.Flags().StringP("output", "o", "", "输出格式（json）")
 	mustMarkFlagRequired(fileMetaCmd, "doc-type")
 }

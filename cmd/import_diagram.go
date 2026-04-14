@@ -57,12 +57,14 @@ var importDiagramCmd = &cobra.Command{
 		diagramType, _ := cmd.Flags().GetString("diagram-type")
 		style, _ := cmd.Flags().GetString("style")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		opts := client.ImportDiagramOptions{
-			SourceType:  sourceType,
-			Syntax:      syntax,
-			DiagramType: diagramType,
-			Style:       style,
+			SourceType:      sourceType,
+			Syntax:          syntax,
+			DiagramType:     diagramType,
+			Style:           style,
+			UserAccessToken: userAccessToken,
 		}
 
 		retryResult := client.DoWithRetry(func() (*client.ImportDiagramResult, http.Header, error) {
@@ -108,5 +110,6 @@ func init() {
 	importDiagramCmd.Flags().String("syntax", "plantuml", "图表语法 (plantuml/mermaid)")
 	importDiagramCmd.Flags().String("diagram-type", "auto", "图表类型 (auto/mindmap/sequence/activity/class/er/flowchart/state/component)")
 	importDiagramCmd.Flags().String("style", "board", "样式类型 (board/classic)")
+	importDiagramCmd.Flags().String("user-access-token", "", "User Access Token")
 	importDiagramCmd.Flags().StringP("output", "o", "", "输出格式 (json)")
 }

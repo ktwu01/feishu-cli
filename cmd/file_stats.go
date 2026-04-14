@@ -37,8 +37,9 @@ var fileStatsCmd = &cobra.Command{
 		fileToken := args[0]
 		docType, _ := cmd.Flags().GetString("doc-type")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		stats, err := client.GetFileStatistics(fileToken, docType)
+		stats, err := client.GetFileStatistics(fileToken, docType, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -66,6 +67,7 @@ var fileStatsCmd = &cobra.Command{
 func init() {
 	fileCmd.AddCommand(fileStatsCmd)
 	fileStatsCmd.Flags().String("doc-type", "", "文件类型（必填）")
+	fileStatsCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文件）")
 	fileStatsCmd.Flags().StringP("output", "o", "", "输出格式（json）")
 	mustMarkFlagRequired(fileStatsCmd, "doc-type")
 }

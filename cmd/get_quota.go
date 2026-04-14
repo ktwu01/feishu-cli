@@ -82,5 +82,6 @@ func formatBytes(bytes int64) string {
 
 func init() {
 	fileCmd.AddCommand(getQuotaCmd)
+	getQuotaCmd.Flags().String("user-access-token", "", "User Access Token（当前命令暂未使用；待 SDK 支持）")
 	getQuotaCmd.Flags().StringP("output", "o", "", "输出格式（json）")
 }

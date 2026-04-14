@@ -30,6 +30,7 @@ var updateBlockCmd = &cobra.Command{
 		blockID := args[1]
 		contentStr, _ := cmd.Flags().GetString("content")
 		contentFile, _ := cmd.Flags().GetString("content-file")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		// Get content from file or flag
 		var contentJSON string
@@ -51,7 +52,7 @@ var updateBlockCmd = &cobra.Command{
 			return fmt.Errorf("解析内容 JSON 失败: %w", err)
 		}
 
-		if _, err := client.UpdateBlock(documentID, blockID, updateContent); err != nil {
+		if _, err := client.UpdateBlock(documentID, blockID, updateContent, userAccessToken); err != nil {
 			return err
 		}
 
@@ -64,4 +65,5 @@ func init() {
 	docCmd.AddCommand(updateBlockCmd)
 	updateBlockCmd.Flags().StringP("content", "c", "", "更新内容 (JSON 格式)")
 	updateBlockCmd.Flags().String("content-file", "", "包含更新内容的 JSON 文件")
+	updateBlockCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文档）")
 }

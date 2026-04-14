@@ -63,10 +63,11 @@ func GetBoardImage(whiteboardID string, outputPath string, userAccessToken ...st
 
 // ImportDiagramOptions contains options for importing diagram to whiteboard
 type ImportDiagramOptions struct {
-	SourceType  string // file or content
-	Syntax      string // plantuml or mermaid
-	DiagramType string // auto, mindmap, sequence, activity, class, er, flowchart, state, component
-	Style       string // board or classic
+	SourceType      string // file or content
+	Syntax          string // plantuml or mermaid
+	DiagramType     string // auto, mindmap, sequence, activity, class, er, flowchart, state, component
+	Style           string // board or classic
+	UserAccessToken string // optional user access token
 }
 
 // ImportDiagramResult contains the result of importing diagram
@@ -163,7 +164,14 @@ func ImportDiagram(whiteboardID string, source string, opts ImportDiagramOptions
 	// 正确的 API 路径是 /nodes/plantuml
 	apiPath := fmt.Sprintf("/open-apis/board/v1/whiteboards/%s/nodes/plantuml", whiteboardID)
 
-	resp, err := client.Post(Context(), apiPath, reqBody, larkcore.AccessTokenTypeTenant)
+	tokenType := larkcore.AccessTokenTypeTenant
+	var reqOpts []larkcore.RequestOptionFunc
+	if opts.UserAccessToken != "" {
+		tokenType = larkcore.AccessTokenTypeUser
+		reqOpts = UserTokenOption(opts.UserAccessToken)
+	}
+
+	resp, err := client.Post(Context(), apiPath, reqBody, tokenType, reqOpts...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("导入图表失败: %w", err)
 	}
@@ -205,8 +213,9 @@ func ImportDiagram(whiteboardID string, source string, opts ImportDiagramOptions
 
 // CreateBoardNotesOptions contains options for creating board nodes
 type CreateBoardNotesOptions struct {
-	ClientToken string
-	UserIDType  string // open_id, union_id, user_id
+	ClientToken     string
+	UserIDType      string // open_id, union_id, user_id
+	UserAccessToken string // optional user access token
 }
 
 // CreateBoardNodes creates nodes on a whiteboard.
@@ -238,7 +247,14 @@ func CreateBoardNodes(whiteboardID string, nodesJSON string, opts CreateBoardNot
 		apiPath += "&client_token=" + opts.ClientToken
 	}
 
-	resp, err := client.Post(Context(), apiPath, reqBody, larkcore.AccessTokenTypeTenant)
+	tokenType := larkcore.AccessTokenTypeTenant
+	var reqOpts []larkcore.RequestOptionFunc
+	if opts.UserAccessToken != "" {
+		tokenType = larkcore.AccessTokenTypeUser
+		reqOpts = UserTokenOption(opts.UserAccessToken)
+	}
+
+	resp, err := client.Post(Context(), apiPath, reqBody, tokenType, reqOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("创建画板节点失败: %w", err)
 	}
@@ -302,7 +318,7 @@ func DownloadBoardImageByURL(imageURL string, outputPath string) error {
 }
 
 // GetBoardNodes 获取画板的所有节点列表
-func GetBoardNodes(whiteboardID string) (json.RawMessage, error) {
+func GetBoardNodes(whiteboardID string, userAccessToken ...string) (json.RawMessage, error) {
 	client, err := GetClient()
 	if err != nil {
 		return nil, err
@@ -310,7 +326,14 @@ func GetBoardNodes(whiteboardID string) (json.RawMessage, error) {
 
 	apiPath := fmt.Sprintf("/open-apis/board/v1/whiteboards/%s/nodes", whiteboardID)
 
-	resp, err := client.Get(Context(), apiPath, nil, larkcore.AccessTokenTypeTenant)
+	tokenType := larkcore.AccessTokenTypeTenant
+	var reqOpts []larkcore.RequestOptionFunc
+	if token := firstString(userAccessToken); token != "" {
+		tokenType = larkcore.AccessTokenTypeUser
+		reqOpts = UserTokenOption(token)
+	}
+
+	resp, err := client.Get(Context(), apiPath, nil, tokenType, reqOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("获取画板节点失败: %w", err)
 	}
@@ -324,7 +347,7 @@ func GetBoardNodes(whiteboardID string) (json.RawMessage, error) {
 
 // DeleteBoardNodes 批量删除画板节点
 // 每批最多 100 个，间隔 1s 避免限流
-func DeleteBoardNodes(whiteboardID string, nodeIDs []string) error {
+func DeleteBoardNodes(whiteboardID string, nodeIDs []string, userAccessToken ...string) error {
 	if len(nodeIDs) == 0 {
 		return nil
 	}
@@ -335,6 +358,12 @@ func DeleteBoardNodes(whiteboardID string, nodeIDs []string) error {
 	}
 
 	apiPath := fmt.Sprintf("/open-apis/board/v1/whiteboards/%s/nodes/batch_delete", whiteboardID)
+	tokenType := larkcore.AccessTokenTypeTenant
+	var reqOpts []larkcore.RequestOptionFunc
+	if token := firstString(userAccessToken); token != "" {
+		tokenType = larkcore.AccessTokenTypeUser
+		reqOpts = UserTokenOption(token)
+	}
 
 	// 分批删除，每批 100 个
 	batchSize := 100
@@ -349,7 +378,7 @@ func DeleteBoardNodes(whiteboardID string, nodeIDs []string) error {
 			"ids": batch,
 		}
 
-		resp, err := client.Delete(Context(), apiPath, reqBody, larkcore.AccessTokenTypeTenant)
+		resp, err := client.Delete(Context(), apiPath, reqBody, tokenType, reqOpts...)
 		if err != nil {
 			return fmt.Errorf("删除画板节点失败: %w", err)
 		}

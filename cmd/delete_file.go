@@ -43,6 +43,7 @@ var deleteFileCmd = &cobra.Command{
 		fileToken := args[0]
 		fileType, _ := cmd.Flags().GetString("type")
 		force, _ := cmd.Flags().GetBool("force")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		// 危险操作确认
 		if !force {
@@ -52,7 +53,7 @@ var deleteFileCmd = &cobra.Command{
 			}
 		}
 
-		taskID, err := client.DeleteFile(fileToken, fileType)
+		taskID, err := client.DeleteFile(fileToken, fileType, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -72,5 +73,6 @@ func init() {
 	fileCmd.AddCommand(deleteFileCmd)
 	deleteFileCmd.Flags().String("type", "", "文件类型（必填）")
 	deleteFileCmd.Flags().BoolP("force", "f", false, "跳过确认直接删除")
+	deleteFileCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文件）")
 	mustMarkFlagRequired(deleteFileCmd, "type")
 }

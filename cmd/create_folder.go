@@ -35,8 +35,9 @@ var createFolderCmd = &cobra.Command{
 		name := args[0]
 		parentToken, _ := cmd.Flags().GetString("parent")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		token, url, err := client.CreateFolder(name, parentToken)
+		token, url, err := client.CreateFolder(name, parentToken, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -64,5 +65,6 @@ var createFolderCmd = &cobra.Command{
 func init() {
 	fileCmd.AddCommand(createFolderCmd)
 	createFolderCmd.Flags().String("parent", "", "父文件夹 Token")
+	createFolderCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文件）")
 	createFolderCmd.Flags().StringP("output", "o", "", "输出格式（json）")
 }

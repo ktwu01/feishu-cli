@@ -53,6 +53,7 @@ var createBoardNotesCmd = &cobra.Command{
 		clientToken, _ := cmd.Flags().GetString("client-token")
 		userIDType, _ := cmd.Flags().GetString("user-id-type")
 		output, _ := cmd.Flags().GetString("output")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		// Get nodes JSON
 		var nodesJSON string
@@ -68,8 +69,9 @@ var createBoardNotesCmd = &cobra.Command{
 		}
 
 		opts := client.CreateBoardNotesOptions{
-			ClientToken: clientToken,
-			UserIDType:  userIDType,
+			ClientToken:     clientToken,
+			UserIDType:      userIDType,
+			UserAccessToken: userAccessToken,
 		}
 
 		nodeIDs, err := client.CreateBoardNodes(whiteboardID, nodesJSON, opts)
@@ -104,5 +106,6 @@ func init() {
 	createBoardNotesCmd.Flags().String("source-type", "file", "源类型 (file/content)")
 	createBoardNotesCmd.Flags().String("client-token", "", "操作唯一标识（幂等）")
 	createBoardNotesCmd.Flags().String("user-id-type", "open_id", "用户 ID 类型 (open_id/union_id/user_id)")
+	createBoardNotesCmd.Flags().String("user-access-token", "", "User Access Token")
 	createBoardNotesCmd.Flags().StringP("output", "o", "", "输出格式 (json)")
 }

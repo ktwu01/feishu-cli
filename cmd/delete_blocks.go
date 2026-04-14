@@ -31,10 +31,11 @@ var deleteBlocksCmd = &cobra.Command{
 		endIndex, _ := cmd.Flags().GetInt("end")
 		deleteAll, _ := cmd.Flags().GetBool("all")
 		force, _ := cmd.Flags().GetBool("force")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
 		if deleteAll {
 			// Get block children count first
-			children, _, err := client.GetBlockChildren(documentID, blockID)
+			children, _, err := client.GetBlockChildren(documentID, blockID, userAccessToken)
 			if err != nil {
 				return fmt.Errorf("获取子块失败: %w", err)
 			}
@@ -66,7 +67,7 @@ var deleteBlocksCmd = &cobra.Command{
 			}
 		}
 
-		if _, err := client.DeleteBlocks(documentID, blockID, startIndex, endIndex); err != nil {
+		if _, err := client.DeleteBlocks(documentID, blockID, startIndex, endIndex, userAccessToken); err != nil {
 			return err
 		}
 
@@ -81,4 +82,5 @@ func init() {
 	deleteBlocksCmd.Flags().Int("end", 0, "结束索引 (不包含)")
 	deleteBlocksCmd.Flags().Bool("all", false, "删除所有子块")
 	deleteBlocksCmd.Flags().BoolP("force", "f", false, "跳过确认直接删除")
+	deleteBlocksCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份访问文档）")
 }

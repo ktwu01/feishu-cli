@@ -189,7 +189,7 @@ func CreateImportTaskWithToken(fileToken, fileType, fileName, targetType, folder
 
 // GetImportTask 查询导入任务状态，返回 jobStatus、docToken、url、error
 // jobStatus: 0=成功, 1=初始化, 2=处理中
-func GetImportTask(ticket string) (int, string, string, error) {
+func GetImportTask(ticket, userAccessToken string) (int, string, string, error) {
 	client, err := GetClient()
 	if err != nil {
 		return -1, "", "", err
@@ -199,7 +199,7 @@ func GetImportTask(ticket string) (int, string, string, error) {
 		Ticket(ticket).
 		Build()
 
-	resp, err := client.Drive.ImportTask.Get(Context(), req)
+	resp, err := client.Drive.ImportTask.Get(Context(), req, UserTokenOption(userAccessToken)...)
 	if err != nil {
 		return -1, "", "", fmt.Errorf("查询导入任务失败: %w", err)
 	}
@@ -230,9 +230,9 @@ func GetImportTask(ticket string) (int, string, string, error) {
 }
 
 // WaitImportTask 轮询等待导入任务完成，返回文档 token 和 url
-func WaitImportTask(ticket string, maxRetries int) (string, string, error) {
+func WaitImportTask(ticket string, maxRetries int, userAccessToken string) (string, string, error) {
 	for i := 0; i < maxRetries; i++ {
-		jobStatus, docToken, url, err := GetImportTask(ticket)
+		jobStatus, docToken, url, err := GetImportTask(ticket, userAccessToken)
 		if err != nil {
 			return "", "", err
 		}

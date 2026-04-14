@@ -34,8 +34,9 @@ var createDocumentCmd = &cobra.Command{
 
 		title, _ := cmd.Flags().GetString("title")
 		folder, _ := cmd.Flags().GetString("folder")
+		userAccessToken := resolveOptionalUserToken(cmd)
 
-		doc, err := client.CreateDocument(title, folder)
+		doc, err := client.CreateDocument(title, folder, userAccessToken)
 		if err != nil {
 			return err
 		}
@@ -79,5 +80,6 @@ func init() {
 	createDocumentCmd.Flags().StringP("title", "t", "", "文档标题（必填）")
 	createDocumentCmd.Flags().StringP("folder", "f", "", "目标文件夹 token")
 	createDocumentCmd.Flags().StringP("output", "o", "", "输出格式（json）")
+	createDocumentCmd.Flags().String("user-access-token", "", "User Access Token（可选，使用用户身份创建文档）")
 	mustMarkFlagRequired(createDocumentCmd, "title")
 }
