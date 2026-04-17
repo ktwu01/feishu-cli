@@ -68,6 +68,9 @@ var listReplyCmd = &cobra.Command{
 			if r.UserID != "" {
 				fmt.Printf("    用户 ID: %s\n", r.UserID)
 			}
+			if r.Content != "" {
+				fmt.Printf("    内容:     %s\n", r.Content)
+			}
 			if r.CreateTime != 0 {
 				fmt.Printf("    创建时间: %d\n", r.CreateTime)
 			}

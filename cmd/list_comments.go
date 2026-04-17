@@ -63,6 +63,9 @@ var listCommentsCmd = &cobra.Command{
 				fmt.Printf("[%d] 评论 ID: %s\n", i+1, c.CommentID)
 				fmt.Printf("    状态:     %s\n", status)
 				fmt.Printf("    类型:     %s\n", scope)
+				if !c.IsWhole && c.Quote != "" {
+					fmt.Printf("    划词原文: %s\n", c.Quote)
+				}
 				if c.CreateTime > 0 {
 					t := time.Unix(int64(c.CreateTime), 0)
 					fmt.Printf("    创建时间: %s\n", t.Format("2006-01-02 15:04:05"))

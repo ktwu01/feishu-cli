@@ -16,7 +16,9 @@ type Comment struct {
 	SolvedTime   int             `json:"solved_time,omitempty"`
 	SolverUserID string          `json:"solver_user_id,omitempty"`
 	IsWhole      bool            `json:"is_whole"`
-	Content      *CommentContent `json:"reply_list,omitempty"`
+	// Quote 划词评论选中的原文；IsWhole=true 时为空
+	Quote   string          `json:"quote,omitempty"`
+	Content *CommentContent `json:"reply_list,omitempty"`
 }
 
 // CommentContent 评论内容
@@ -71,6 +73,7 @@ func ListComments(fileToken string, fileType string, pageSize int, pageToken str
 				SolvedTime:   IntVal(item.SolvedTime),
 				SolverUserID: StringVal(item.SolverUserId),
 				IsWhole:      BoolVal(item.IsWhole),
+				Quote:        StringVal(item.Quote),
 			})
 		}
 	}
@@ -164,6 +167,7 @@ func GetComment(fileToken string, commentID string, fileType string) (*Comment, 
 		CreateTime: IntVal(resp.Data.CreateTime),
 		IsSolved:   BoolVal(resp.Data.IsSolved),
 		IsWhole:    BoolVal(resp.Data.IsWhole),
+		Quote:      StringVal(resp.Data.Quote),
 	}, nil
 }
 
