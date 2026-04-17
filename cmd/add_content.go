@@ -195,7 +195,6 @@ func deleteContainerAutoEmptyBlock(documentID, parentID string, blockType int, u
 
 		firstChild := childrenResult.Value[0]
 		if !isEmptyTextBlock(firstChild) {
-			// index 0 不是空块，可能自动生成块尚未出现，重试
 			continue
 		}
 
