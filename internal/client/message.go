@@ -49,19 +49,25 @@ func SendMessage(receiveIDType string, receiveID string, msgType string, content
 	return *resp.Data.MessageId, nil
 }
 
-// ReplyMessage replies to a message
-func ReplyMessage(messageID string, msgType string, content string, userAccessToken string) (string, error) {
+// ReplyMessage replies to a message.
+// 当 replyInThread 为 true 时，以话题（thread）形式回复；
+// 若目标群聊本身就是话题模式，该参数会自动回复到消息所在话题。
+func ReplyMessage(messageID string, msgType string, content string, replyInThread bool, userAccessToken string) (string, error) {
 	client, err := GetClient()
 	if err != nil {
 		return "", err
 	}
 
+	bodyBuilder := larkim.NewReplyMessageReqBodyBuilder().
+		MsgType(msgType).
+		Content(content)
+	if replyInThread {
+		bodyBuilder.ReplyInThread(true)
+	}
+
 	req := larkim.NewReplyMessageReqBuilder().
 		MessageId(messageID).
-		Body(larkim.NewReplyMessageReqBodyBuilder().
-			MsgType(msgType).
-			Content(content).
-			Build()).
+		Body(bodyBuilder.Build()).
 		Build()
 
 	resp, err := client.Im.Message.Reply(Context(), req, UserTokenOption(userAccessToken)...)

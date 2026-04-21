@@ -15,11 +15,12 @@ var replyMsgCmd = &cobra.Command{
 	Long: `回复指定的消息。
 
 参数:
-  message_id       消息 ID（必填）
-  --msg-type       消息类型（默认 text）
-  --text, -t       简单文本消息（快捷方式）
-  --content, -c    消息内容 JSON
-  --content-file   消息内容 JSON 文件
+  message_id          消息 ID（必填）
+  --msg-type          消息类型（默认 text）
+  --text, -t          简单文本消息（快捷方式）
+  --content, -c       消息内容 JSON
+  --content-file      消息内容 JSON 文件
+  --reply-in-thread   以话题（thread）形式回复；若群聊已是话题模式，则自动回复到消息所在话题
 
 消息类型:
   text         文本消息
@@ -34,7 +35,10 @@ var replyMsgCmd = &cobra.Command{
   feishu-cli msg reply om_xxx --msg-type post --content-file reply.json
 
   # 回复卡片消息
-  feishu-cli msg reply om_xxx --msg-type interactive --content '{"type":"template",...}'`,
+  feishu-cli msg reply om_xxx --msg-type interactive --content '{"type":"template",...}'
+
+  # 以话题形式回复（在非话题群聊中开启一个新话题）
+  feishu-cli msg reply om_xxx --text "这里开个话题" --reply-in-thread`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := config.Validate(); err != nil {
@@ -48,6 +52,7 @@ var replyMsgCmd = &cobra.Command{
 		content, _ := cmd.Flags().GetString("content")
 		contentFile, _ := cmd.Flags().GetString("content-file")
 		text, _ := cmd.Flags().GetString("text")
+		replyInThread, _ := cmd.Flags().GetBool("reply-in-thread")
 
 		var msgContent string
 		if contentFile != "" {
@@ -65,7 +70,7 @@ var replyMsgCmd = &cobra.Command{
 			return fmt.Errorf("必须指定 --content、--content-file 或 --text")
 		}
 
-		newMessageID, err := client.ReplyMessage(messageID, msgType, msgContent, token)
+		newMessageID, err := client.ReplyMessage(messageID, msgType, msgContent, replyInThread, token)
 		if err != nil {
 			return err
 		}
@@ -84,5 +89,6 @@ func init() {
 	replyMsgCmd.Flags().StringP("text", "t", "", "简单文本消息")
 	replyMsgCmd.Flags().StringP("content", "c", "", "消息内容 JSON")
 	replyMsgCmd.Flags().String("content-file", "", "消息内容 JSON 文件")
+	replyMsgCmd.Flags().Bool("reply-in-thread", false, "以话题形式回复（reply_in_thread=true）")
 	replyMsgCmd.Flags().String("user-access-token", "", "User Access Token（用户授权令牌）")
 }

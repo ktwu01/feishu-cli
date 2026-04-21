@@ -19,8 +19,9 @@ var sendMessageCmd = &cobra.Command{
 	Long: `向飞书用户或群组发送消息。
 
 参数:
-  --receive-id-type   接收者类型（必填）
-  --receive-id        接收者标识（必填）
+  --receive-id-type   接收者类型（与 --thread-id 二选一）
+  --receive-id        接收者标识（与 --thread-id 二选一）
+  --thread-id         话题 ID（omt_xxx），在已有话题内追加一条消息（等价于 receive_id_type=thread_id）
   --msg-type          消息类型（默认: text）
   --content, -c       消息内容 JSON
   --content-file      消息内容 JSON 文件
@@ -36,6 +37,7 @@ var sendMessageCmd = &cobra.Command{
   user_id     用户 ID
   union_id    Union ID
   chat_id     群组 ID
+  thread_id   话题 ID（在话题内追加消息，通常用 --thread-id 代替）
 
 消息类型:
   text         文本消息
@@ -87,7 +89,12 @@ var sendMessageCmd = &cobra.Command{
     --receive-id user@example.com \
     --msg-type interactive \
     --content-file card.json \
-    --upload-images`,
+    --upload-images
+
+  # 在已有话题内追加消息
+  feishu-cli msg send \
+    --thread-id omt_xxx \
+    --text "话题内继续聊"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := config.Validate(); err != nil {
 			return err
@@ -97,6 +104,18 @@ var sendMessageCmd = &cobra.Command{
 
 		receiveIDType, _ := cmd.Flags().GetString("receive-id-type")
 		receiveID, _ := cmd.Flags().GetString("receive-id")
+		threadID, _ := cmd.Flags().GetString("thread-id")
+		if threadID != "" {
+			// --thread-id 是 receive_id_type=thread_id 的语法糖，
+			// 为避免歧义，禁止同时传 --receive-id / --receive-id-type
+			if receiveIDType != "" || receiveID != "" {
+				return fmt.Errorf("--thread-id 与 --receive-id-type/--receive-id 互斥，只能指定一组")
+			}
+			receiveIDType = "thread_id"
+			receiveID = threadID
+		} else if receiveIDType == "" || receiveID == "" {
+			return fmt.Errorf("必须指定 --thread-id，或同时指定 --receive-id-type 和 --receive-id")
+		}
 		msgType, _ := cmd.Flags().GetString("msg-type")
 		content, _ := cmd.Flags().GetString("content")
 		contentFile, _ := cmd.Flags().GetString("content-file")
@@ -223,8 +242,9 @@ var sendMessageCmd = &cobra.Command{
 
 func init() {
 	msgCmd.AddCommand(sendMessageCmd)
-	sendMessageCmd.Flags().String("receive-id-type", "", "接收者类型（email/open_id/user_id/union_id/chat_id）")
+	sendMessageCmd.Flags().String("receive-id-type", "", "接收者类型（email/open_id/user_id/union_id/chat_id/thread_id）")
 	sendMessageCmd.Flags().String("receive-id", "", "接收者标识")
+	sendMessageCmd.Flags().String("thread-id", "", "话题 ID（omt_xxx），在已有话题内追加消息；与 --receive-id-type/--receive-id 互斥")
 	sendMessageCmd.Flags().String("msg-type", "text", "消息类型（text/post/image/interactive 等）")
 	sendMessageCmd.Flags().StringP("content", "c", "", "消息内容 JSON")
 	sendMessageCmd.Flags().String("content-file", "", "消息内容 JSON 文件")
@@ -234,7 +254,6 @@ func init() {
 	sendMessageCmd.Flags().Bool("upload-images", false, "自动解析并上传 post/interactive 消息中的本地图片")
 	sendMessageCmd.Flags().StringP("output", "o", "", "输出格式（json）")
 	sendMessageCmd.Flags().String("user-access-token", "", "User Access Token（用户授权令牌）")
-	mustMarkFlagRequired(sendMessageCmd, "receive-id-type", "receive-id")
 }
 
 // markdown 图片正则: ![alt](path)
