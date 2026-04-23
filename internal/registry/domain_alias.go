@@ -88,12 +88,12 @@ var extraDomainScopes = map[string][]string{
 	"chat": {
 		"im:chat:read", "im:chat:update",
 		"im:message.group_msg:get_as_user", "im:message.p2p_msg:get_as_user", // +chat-messages-list UserScopes
-		"contact:user.base:readonly",           // +chat-messages-list UserScopes
+		"contact:user.base:readonly",            // +chat-messages-list UserScopes
 		"contact:user.basic_profile:readonly",   // +messages-mget UserScopes
 		"im:message:readonly",                   // +messages-resources-download
 		"search:message",                        // +messages-search
 		"im:message.send_as_user", "im:message", // +messages-send/reply UserScopes
-		"im:chat:create_by_user",                // +chat-create UserScopes
+		"im:chat:create_by_user", // +chat-create UserScopes
 	},
 
 	// task shortcuts: +create, +update, +comment, +complete, +reopen, +assign, +followers, +reminder,
@@ -106,10 +106,10 @@ var extraDomainScopes = map[string][]string{
 
 	// calendar shortcuts: +agenda, +create, +freebusy, +room-find, +rsvp, +suggestion
 	"calendar": {
-		"calendar:calendar.event:read",   // +agenda
-		"calendar:calendar.event:create",  // +create
-		"calendar:calendar.event:update",  // +create
-		"calendar:calendar.event:reply",   // +rsvp
+		"calendar:calendar.event:read",     // +agenda
+		"calendar:calendar.event:create",   // +create
+		"calendar:calendar.event:update",   // +create
+		"calendar:calendar.event:reply",    // +rsvp
 		"calendar:calendar.free_busy:read", // +freebusy, +room-find, +suggestion
 	},
 

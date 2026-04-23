@@ -669,9 +669,38 @@ feishu-cli msg resource-download <message_id> <file_key> --type image -o /tmp/ph
 
 > **file_key 来源**：通过 `msg get <message_id>` 获取消息详情，从 content 中提取 `image_key` 或 `file_key`。
 
-## 话题回复列表
+## 话题（Thread）消息
 
-获取话题（Thread）中的所有回复消息。
+### 发送到已有话题
+
+`msg send` 支持 `--thread-id`（等价于 `--receive-id-type thread_id --receive-id <thread_id>`）：
+
+```bash
+# 在已有话题内追加一条消息
+feishu-cli msg send --thread-id omt_xxx --text "话题内继续聊"
+
+# 卡片消息也支持
+feishu-cli msg send --thread-id omt_xxx \
+  --msg-type interactive \
+  --content "$(cat card.json)"
+```
+
+> `--thread-id` 与 `--receive-id-type/--receive-id` **互斥**，只能指定一组。
+
+### 回复时开启话题
+
+`msg reply` 支持 `--reply-in-thread`（`reply_in_thread=true`）：
+
+```bash
+# 在非话题群聊中，以话题形式回复某条消息（会开启一个新话题）
+feishu-cli msg reply om_xxx --text "这里开个话题" --reply-in-thread
+
+# 若群聊已是话题模式，--reply-in-thread 会自动回复到消息所在话题
+```
+
+### 话题回复列表
+
+获取话题中的所有回复消息：
 
 ```bash
 # 获取话题回复

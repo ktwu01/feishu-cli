@@ -11,14 +11,14 @@ import (
 
 // Comment 评论信息
 type Comment struct {
-	CommentID    string          `json:"comment_id"`
-	UserID       string          `json:"user_id,omitempty"`
-	CreateTime   int             `json:"create_time,omitempty"`
-	UpdateTime   int             `json:"update_time,omitempty"`
-	IsSolved     bool            `json:"is_solved"`
-	SolvedTime   int             `json:"solved_time,omitempty"`
-	SolverUserID string          `json:"solver_user_id,omitempty"`
-	IsWhole      bool            `json:"is_whole"`
+	CommentID    string `json:"comment_id"`
+	UserID       string `json:"user_id,omitempty"`
+	CreateTime   int    `json:"create_time,omitempty"`
+	UpdateTime   int    `json:"update_time,omitempty"`
+	IsSolved     bool   `json:"is_solved"`
+	SolvedTime   int    `json:"solved_time,omitempty"`
+	SolverUserID string `json:"solver_user_id,omitempty"`
+	IsWhole      bool   `json:"is_whole"`
 	// Quote 划词评论选中的原文；IsWhole=true 时为空
 	Quote   string          `json:"quote,omitempty"`
 	Content *CommentContent `json:"reply_list,omitempty"`

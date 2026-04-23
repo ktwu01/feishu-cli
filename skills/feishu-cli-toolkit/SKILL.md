@@ -44,7 +44,7 @@ allowed-tools: Bash, Read, Write
 | # | 模块 | 核心命令 | 详细参考 |
 |---|------|---------|---------|
 | 1 | 电子表格 | `sheet create/get/read/write/append` + V3 富文本 | `references/sheet-commands.md` |
-| 1.5 | 文档表格 | `doc table insert-row/column/delete-rows/columns/merge-cells/unmerge-cells` | — |
+| 1.5 | 文档表格 | `doc table insert-row/column/delete-rows/columns/merge-cells/unmerge-cells` | 详见 `feishu-cli-write` |
 | 2 | 日历日程 | `calendar list/get/primary/create-event/event-search/freebusy` | `references/calendar-commands.md` |
 | 3 | 任务管理 | `task create/complete/delete` + subtask/member/reminder + `tasklist` | `references/task-commands.md` |
 | 4 | 群聊创建 | `chat create/link`（App Token，群信息/成员/消息互动请用 **feishu-cli-chat**） | `references/chat-commands.md` |
@@ -640,8 +640,16 @@ feishu-cli comment unresolve <file_token> <comment_id> --type docx
 
 # 回复管理
 feishu-cli comment reply list <file_token> <comment_id> --type docx
+
+# 添加回复（推荐先 auth login，以用户身份发布）
+feishu-cli comment reply add <file_token> <comment_id> --text "已处理" --type docx
+
 feishu-cli comment reply delete <file_token> <comment_id> <reply_id> --type docx
 ```
+
+> **User Token 提示**：`reply add` 建议使用 User Token（登录态），以用户身份发出；
+> App/Bot 身份添加的回复只能被同一 App 自己删除，且经常收到 1069303 forbidden。
+> `reply delete` 同理——飞书 Open API 只允许回复作者本人删除。
 
 ### 支持的文件类型
 
@@ -677,6 +685,10 @@ feishu-cli wiki space-get <space_id>
 feishu-cli wiki member add <space_id> --member-type userid --member-id <USER_ID> --role admin
 feishu-cli wiki member list <space_id>
 feishu-cli wiki member remove <space_id> --member-type userid --member-id <USER_ID> --role admin
+
+# 将云空间文档迁入知识库（docx/doc/sheet/mindnote/bitable/file）
+feishu-cli wiki move-docs <obj_token> --space-id <space_id> [--obj-type docx] \
+  [--parent-node <node_token>] [--apply] [--user-access-token u-xxx]
 ```
 
 ### 重要概念
@@ -686,7 +698,15 @@ feishu-cli wiki member remove <space_id> --member-type userid --member-id <USER_
 - 成员角色：`admin`（管理员）、`member`（成员）
 - 成员类型：`openchat`、`userid`、`email`、`opendepartmentid`、`openid`
 
-**权限要求**：`wiki:wiki:readonly`（读取）、`wiki:wiki`（空间成员管理）
+### move-docs 关键点
+
+- 移动后文档从「我的空间 / 共享空间 / 快速访问」入口消失，权限默认继承父页面
+- 大文档异步执行，返回 `task_id` 供查询；无权限且传 `--apply` 时会提交迁入申请
+- 调用方须同时是**源文档编辑者** + **目标空间成员**（或父节点容器编辑者）
+- 企业版知识空间不接受 `app` 作为成员——此时必须传 `--user-access-token` 走用户身份
+- `--obj-type` 默认 `docx`，挂载电子表格/多维表格需显式指定 `sheet`/`bitable`
+
+**权限要求**：`wiki:wiki:readonly`（读取）、`wiki:wiki`（空间成员管理）、`wiki:node:move` 或 `wiki:wiki`（move-docs）
 
 ---
 
