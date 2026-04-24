@@ -867,6 +867,35 @@ func InsertTableRow(documentID, tableBlockID string, index int, userAccessToken 
 	return err
 }
 
+// InsertRowProgressFunc 为 AppendTableRows 可选进度回调：
+// appended 为已成功追加的行数（1-based），total 为本次计划追加的总行数。
+type InsertRowProgressFunc func(appended, total int)
+
+// AppendTableRows 在表格末尾追加 count 行，用于突破 create_block 的 9 行上限。
+// 将大表保持为单个 table block，避免视觉上被切成多个独立表格。
+// 每行独立调用 insert_table_row（batch_update 不支持同 block 多操作）；progress 可为 nil。
+func AppendTableRows(documentID, tableBlockID string, count int, progress InsertRowProgressFunc, userAccessToken string) error {
+	return appendRowsLoop(count, progress, func() error {
+		return InsertTableRow(documentID, tableBlockID, -1, userAccessToken)
+	})
+}
+
+// appendRowsLoop 从网络调用中解耦的纯循环，便于单测。
+func appendRowsLoop(count int, progress InsertRowProgressFunc, insertOne func() error) error {
+	if count <= 0 {
+		return nil
+	}
+	for i := 0; i < count; i++ {
+		if err := insertOne(); err != nil {
+			return fmt.Errorf("追加第 %d 行失败: %w", i+1, err)
+		}
+		if progress != nil {
+			progress(i+1, count)
+		}
+	}
+	return nil
+}
+
 // InsertTableColumn 在表格中插入一列
 // index = -1 表示插入到表格末尾
 func InsertTableColumn(documentID, tableBlockID string, index int, userAccessToken ...string) error {

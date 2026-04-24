@@ -859,9 +859,9 @@ func TestImageConversion(t *testing.T) {
 	}
 }
 
-// TestLargeTableSplitting 测试大表格自动拆分
+// TestLargeTableSplitting 验证大表格采用"单表 + 扩展行"策略以保证视觉连贯
 func TestLargeTableSplitting(t *testing.T) {
-	// 创建一个 10 行的表格（超过 9 行限制）
+	// 创建一个 10 行的表格（超过 9 行创建上限）
 	markdown := `| H1 | H2 |
 |----|-----|
 | a  | b  |
@@ -882,21 +882,27 @@ func TestLargeTableSplitting(t *testing.T) {
 	}
 	blocks := FlattenBlockNodes(result.BlockNodes)
 
-	// 应该生成至少 2 个表格块（拆分后）
+	// 应产出唯一一个表格块（超出部分通过 insert_table_row API 追加）
 	tableCount := 0
 	for _, block := range blocks {
 		if block.BlockType != nil && *block.BlockType == int(BlockTypeTable) {
 			tableCount++
 		}
 	}
-
-	if tableCount < 2 {
-		t.Errorf("expected at least 2 table blocks after splitting, got %d", tableCount)
+	if tableCount != 1 {
+		t.Errorf("expected 1 table block (rows extended via API), got %d", tableCount)
+	}
+	if len(result.TableDatas) != 1 {
+		t.Fatalf("expected 1 table data entry, got %d", len(result.TableDatas))
 	}
 
-	// 验证 tableData 也相应拆分
-	if len(result.TableDatas) < 2 {
-		t.Errorf("expected at least 2 table data entries, got %d", len(result.TableDatas))
+	// 初始表：header + 8 data = 9 rows；剩余 1 行进 ExtraRowContents
+	td := result.TableDatas[0]
+	if td.Rows != 9 {
+		t.Errorf("initial table rows = %d, want 9", td.Rows)
+	}
+	if len(td.ExtraRowContents) != 1 {
+		t.Errorf("ExtraRowContents len = %d, want 1", len(td.ExtraRowContents))
 	}
 }
 
@@ -3350,7 +3356,7 @@ func TestConvertCalloutWithMultipleBlockTypes(t *testing.T) {
 	}
 }
 
-// TestConvertTableWithDataMultipleLargeTable 测试大表格（超过 9 行）的自动拆分
+// TestConvertTableWithDataMultipleLargeTable 验证大表格使用"单表 + 扩展行"策略
 func TestConvertTableWithDataMultipleLargeTable(t *testing.T) {
 	var sb strings.Builder
 	sb.WriteString("| Col A | Col B |\n")
@@ -3365,9 +3371,16 @@ func TestConvertTableWithDataMultipleLargeTable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// 15 行 + header > 9 行，应该拆分为多个表格
-	if len(result.TableDatas) < 2 {
-		t.Errorf("expected multiple tables due to row limit split, got %d", len(result.TableDatas))
+	// 15 行 + header = 16 行；应产出单个表：初始 9 行（header+8 data），扩展 7 行
+	if len(result.TableDatas) != 1 {
+		t.Fatalf("expected 1 table (extended via API), got %d", len(result.TableDatas))
+	}
+	td := result.TableDatas[0]
+	if td.Rows != 9 {
+		t.Errorf("initial Rows = %d, want 9", td.Rows)
+	}
+	if len(td.ExtraRowContents) != 7 {
+		t.Errorf("ExtraRowContents len = %d, want 7", len(td.ExtraRowContents))
 	}
 }
 

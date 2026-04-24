@@ -1400,6 +1400,11 @@ type TableData struct {
 	CellContents []string                  // 纯文本内容（兼容）
 	CellElements [][]*larkdocx.TextElement // 富文本元素（保留链接等样式）
 	HasHeader    bool
+	// ExtraRowContents: 超过 maxTableRows 后需通过 insert_table_row API 追加的数据行（纯文本）
+	// 每个元素为一行的单元格内容（长度应等于 Cols）
+	ExtraRowContents [][]string
+	// ExtraRowElements: 超过 maxTableRows 后需追加的数据行（富文本元素，与 ExtraRowContents 对应）
+	ExtraRowElements [][][]*larkdocx.TextElement
 }
 
 // ConvertTableResult contains both the block and the table data for content filling
@@ -1556,65 +1561,45 @@ func (c *MarkdownToBlock) convertTableWithDataMultiple(node *east.Table) []*Conv
 			}
 		}
 
-		// 不超过行限制，直接返回单个表格
-		if groupTotalRows <= maxTableRows {
-			blockType := int(BlockTypeTable)
-			headerRow := groupHasHeader
-			rows := groupTotalRows
-			block := &larkdocx.Block{
-				BlockType: &blockType,
-				Table: &larkdocx.Table{
-					Property: &larkdocx.TableProperty{
-						RowSize:     &rows,
-						ColumnSize:  &groupCols,
-						ColumnWidth: groupColWidths,
-						HeaderRow:   &headerRow,
-					},
-				},
-			}
-			return []*ConvertTableResult{{
-				Block:     block,
-				TableData: buildTableData(rows, groupDataRows, groupDataRowElements),
-			}}
-		}
-
-		// 行拆分
-		var results []*ConvertTableResult
-		maxDataRowsPerTable := maxTableRows
+		// 行数≤限制：直接创建单表
+		// 行数>限制：创建 maxTableRows 行的初始表，剩余行通过 insert_table_row API 追加
+		// （飞书 API 限制 create_block 单表最多 9 行，但 insert_table_row 可突破此限制）
+		initialDataRowCount := maxTableRows
 		if groupHasHeader {
-			maxDataRowsPerTable = maxTableRows - 1
+			initialDataRowCount = maxTableRows - 1
 		}
-		for i := 0; i < len(groupDataRows); i += maxDataRowsPerTable {
-			end := i + maxDataRowsPerTable
-			if end > len(groupDataRows) {
-				end = len(groupDataRows)
-			}
-			chunkDataRows := groupDataRows[i:end]
-			chunkDataElements := groupDataRowElements[i:end]
+		if initialDataRowCount > len(groupDataRows) {
+			initialDataRowCount = len(groupDataRows)
+		}
 
-			rows := len(chunkDataRows)
-			if groupHasHeader {
-				rows++
-			}
-			blockType := int(BlockTypeTable)
-			headerRow := groupHasHeader
-			block := &larkdocx.Block{
-				BlockType: &blockType,
-				Table: &larkdocx.Table{
-					Property: &larkdocx.TableProperty{
-						RowSize:     &rows,
-						ColumnSize:  &groupCols,
-						ColumnWidth: groupColWidths,
-						HeaderRow:   &headerRow,
-					},
-				},
-			}
-			results = append(results, &ConvertTableResult{
-				Block:     block,
-				TableData: buildTableData(rows, chunkDataRows, chunkDataElements),
-			})
+		initialDataRows := groupDataRows[:initialDataRowCount]
+		initialDataElements := groupDataRowElements[:initialDataRowCount]
+		extraDataRows := groupDataRows[initialDataRowCount:]
+		extraDataElements := groupDataRowElements[initialDataRowCount:]
+
+		initialRows := initialDataRowCount
+		if groupHasHeader {
+			initialRows++
 		}
-		return results
+		blockType := int(BlockTypeTable)
+		headerRow := groupHasHeader
+		block := &larkdocx.Block{
+			BlockType: &blockType,
+			Table: &larkdocx.Table{
+				Property: &larkdocx.TableProperty{
+					RowSize:     &initialRows,
+					ColumnSize:  &groupCols,
+					ColumnWidth: groupColWidths,
+					HeaderRow:   &headerRow,
+				},
+			},
+		}
+		td := buildTableData(initialRows, initialDataRows, initialDataElements)
+		if len(extraDataRows) > 0 {
+			td.ExtraRowContents = extraDataRows
+			td.ExtraRowElements = extraDataElements
+		}
+		return []*ConvertTableResult{{Block: block, TableData: td}}
 	}
 
 	// 无需列拆分：直接走行拆分逻辑

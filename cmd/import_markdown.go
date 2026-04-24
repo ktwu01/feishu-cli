@@ -910,24 +910,28 @@ func processDiagramTask(task diagramTask, maxRetries int, verbose bool, userAcce
 
 // processTableTask 处理单个表格填充任务（带重试）
 func processTableTask(documentID string, task tableTask, verbose bool, userAccessToken string) tableResult {
+	extraRowCount := len(task.tableData.ExtraRowContents)
 	if verbose {
-		syncPrintf("  [表格 %d] 填充 %d×%d...\n", task.index, task.tableData.Rows, task.tableData.Cols)
+		if extraRowCount > 0 {
+			syncPrintf("  [表格 %d] 填充 %d×%d（+%d 追加行）...\n",
+				task.index, task.tableData.Rows, task.tableData.Cols, extraRowCount)
+		} else {
+			syncPrintf("  [表格 %d] 填充 %d×%d...\n", task.index, task.tableData.Rows, task.tableData.Cols)
+		}
 	}
 
 	const maxRetries = 5
 
-	result := client.DoVoidWithRetry(func() (http.Header, error) {
-		// 获取表格单元格 ID
-		cellIDs, err := client.GetTableCellIDs(documentID, task.tableBlockID, userAccessToken)
-		if err != nil {
-			return nil, err
-		}
+	// 追加行数 ≥ 5 时每 5 行打一次进度，防止用户误判卡死
+	var onProgress client.InsertRowProgressFunc
+	if verbose {
+		onProgress = tableAppendProgress(extraRowCount, 5, 5, func(appended, total int) {
+			syncPrintf("    [表格 %d] 追加行 %d/%d\n", task.index, appended, total)
+		})
+	}
 
-		// 填充单元格内容（优先使用富文本元素以保留链接等样式）
-		if len(task.tableData.CellElements) > 0 {
-			return nil, client.FillTableCellsRich(documentID, cellIDs, task.tableData.CellElements, task.tableData.CellContents, userAccessToken)
-		}
-		return nil, client.FillTableCells(documentID, cellIDs, task.tableData.CellContents, userAccessToken)
+	result := client.DoVoidWithRetry(func() (http.Header, error) {
+		return nil, fillTableWithExtraRows(documentID, task.tableBlockID, task.tableData, userAccessToken, onProgress)
 	}, client.RetryConfig{
 		MaxRetries:       maxRetries,
 		RetryOnRateLimit: true,

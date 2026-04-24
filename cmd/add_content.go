@@ -340,24 +340,18 @@ func addContentMarkdown(documentID, blockID, contentData, basePath string, uploa
 	return nil
 }
 
-// fillTableWithRetry 填充单个表格内容，带重试（最多 5 次，full jitter 退避）
+// fillTableWithRetry 填充单个表格内容，带重试（最多 5 次）。
+// 委托给共享的 fillTableWithExtraRows，保证：
+//   - 行数超过 9 行时通过 insert_table_row 追加到同一个 block（视觉连贯）
+//   - 重试幂等，不会因 retry 而重复追加行
 func fillTableWithRetry(documentID, tableBlockID string, td *converter.TableData, userAccessToken string) bool {
-	result := client.DoVoidWithRetry(func() (http.Header, error) {
-		cellIDs, err := client.GetTableCellIDs(documentID, tableBlockID, userAccessToken)
-		if err != nil {
-			return nil, fmt.Errorf("获取单元格失败: %w", err)
-		}
+	// 追加行数 ≥ 5 时每 5 行打一次进度
+	onProgress := tableAppendProgress(len(td.ExtraRowContents), 5, 5, func(appended, total int) {
+		fmt.Printf("  [表格] 追加行 %d/%d\n", appended, total)
+	})
 
-		if len(td.CellElements) > 0 {
-			if err := client.FillTableCellsRich(documentID, cellIDs, td.CellElements, td.CellContents, userAccessToken); err != nil {
-				return nil, fmt.Errorf("填充内容失败: %w", err)
-			}
-			return nil, nil
-		}
-		if err := client.FillTableCells(documentID, cellIDs, td.CellContents, userAccessToken); err != nil {
-			return nil, fmt.Errorf("填充内容失败: %w", err)
-		}
-		return nil, nil
+	result := client.DoVoidWithRetry(func() (http.Header, error) {
+		return nil, fillTableWithExtraRows(documentID, tableBlockID, td, userAccessToken, onProgress)
 	}, client.RetryConfig{
 		MaxRetries:       5,
 		RetryOnRateLimit: true,

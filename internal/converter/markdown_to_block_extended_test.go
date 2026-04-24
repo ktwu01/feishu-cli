@@ -1081,16 +1081,17 @@ func TestMarkdownToBlockLargeTable(t *testing.T) {
 		t.Fatalf("ConvertWithTableData failed: %v", err)
 	}
 
-	// 15 行数据 + 1 行表头 = 16 行，应拆分为至少 2 个表格
-	if len(result.TableDatas) < 2 {
-		t.Errorf("expected at least 2 tables, got %d", len(result.TableDatas))
+	// 15 行数据 + 1 行表头 = 16 行；采用"单表+扩展行"策略，仅产出 1 张表
+	if len(result.TableDatas) != 1 {
+		t.Fatalf("expected 1 table (rows extended via API), got %d", len(result.TableDatas))
 	}
-
-	// 验证每个表格都不超过 maxTableRows 行
-	for i, td := range result.TableDatas {
-		if td.Rows > maxTableRows {
-			t.Errorf("table %d has %d rows, exceeds maxTableRows %d", i, td.Rows, maxTableRows)
-		}
+	td := result.TableDatas[0]
+	if td.Rows > maxTableRows {
+		t.Errorf("initial Rows = %d, exceeds maxTableRows %d", td.Rows, maxTableRows)
+	}
+	// 初始 9 行（header + 8 data）+ 7 扩展行 = 16 行
+	if len(td.ExtraRowContents) != 7 {
+		t.Errorf("ExtraRowContents len = %d, want 7", len(td.ExtraRowContents))
 	}
 }
 
@@ -1304,7 +1305,7 @@ func TestMarkdownToBlockWideTable(t *testing.T) {
 
 func TestMarkdownToBlockWideAndTallTable(t *testing.T) {
 	// 构造 12 列 × 15 行数据（+ 1 行表头）= 16 行
-	// 预期：列拆分为 2 组（9 列 + 4 列），每组行拆分 → 共 4 个子表格
+	// 预期：列拆分为 2 组（9 列 + 4 列），每组采用"单表+扩展行" → 共 2 个子表格
 	header := "| 名称 |"
 	sep := "|------|"
 	for i := 1; i < 12; i++ {
@@ -1326,22 +1327,26 @@ func TestMarkdownToBlockWideAndTallTable(t *testing.T) {
 		t.Fatalf("ConvertWithTableData failed: %v", err)
 	}
 
-	// 12 列 × 16 行 → 列拆分 2 组 × 行拆分 2 个 = 4 个子表格
-	if len(result.TableDatas) != 4 {
-		t.Fatalf("expected 4 tables, got %d", len(result.TableDatas))
+	// 12 列 × 16 行 → 列拆分 2 组，每组单表+扩展行 = 2 个子表格
+	if len(result.TableDatas) != 2 {
+		t.Fatalf("expected 2 tables (1 per column group), got %d", len(result.TableDatas))
 	}
 
-	// 验证所有表格都不超过限制
+	// 验证初始表格在创建上限内，且有扩展行待追加
 	for i, td := range result.TableDatas {
 		if td.Rows > maxTableRows {
-			t.Errorf("table %d has %d rows, exceeds maxTableRows %d", i, td.Rows, maxTableRows)
+			t.Errorf("table %d initial Rows = %d, exceeds maxTableRows %d", i, td.Rows, maxTableRows)
 		}
 		if td.Cols > maxTableCols {
-			t.Errorf("table %d has %d cols, exceeds maxTableCols %d", i, td.Cols, maxTableCols)
+			t.Errorf("table %d Cols = %d, exceeds maxTableCols %d", i, td.Cols, maxTableCols)
+		}
+		// 初始 9 行（header + 8 data）+ 7 扩展行 = 16 行
+		if len(td.ExtraRowContents) != 7 {
+			t.Errorf("table %d ExtraRowContents len = %d, want 7", i, len(td.ExtraRowContents))
 		}
 	}
 
-	// 验证 CellContents 数量
+	// 验证初始 CellContents 与 Rows × Cols 匹配
 	for i, td := range result.TableDatas {
 		expected := td.Rows * td.Cols
 		if len(td.CellContents) != expected {
