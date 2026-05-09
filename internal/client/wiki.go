@@ -1,7 +1,10 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
 
 	larkwiki "github.com/larksuite/oapi-sdk-go/v3/service/wiki/v2"
 )
@@ -518,4 +521,95 @@ func MoveDocsToWiki(spaceID, objType, objToken, parentWikiToken string, apply bo
 		result.Applied = BoolVal(resp.Data.Applied)
 	}
 	return result, nil
+}
+
+// WikiDeleteSpaceTaskStatus 表示 delete_space 异步任务的状态。
+type WikiDeleteSpaceTaskStatus struct {
+	TaskID    string
+	Status    string // success / failure / processing 等
+	StatusMsg string
+}
+
+// Ready 表示任务已成功完成。
+func (s WikiDeleteSpaceTaskStatus) Ready() bool {
+	return strings.EqualFold(strings.TrimSpace(s.Status), "success")
+}
+
+// Failed 表示任务以失败状态结束。
+func (s WikiDeleteSpaceTaskStatus) Failed() bool {
+	st := strings.ToLower(strings.TrimSpace(s.Status))
+	return st == "failure" || st == "failed"
+}
+
+// DeleteWikiSpace 提交知识空间删除请求。返回 task_id 为空表示同步删除完成；
+// 非空表示后端转为异步任务，需要后续轮询 GetWikiDeleteSpaceTask。
+func DeleteWikiSpace(spaceID, userAccessToken string) (string, error) {
+	c, err := GetClient()
+	if err != nil {
+		return "", err
+	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
+	apiPath := fmt.Sprintf("/open-apis/wiki/v2/spaces/%s", spaceID)
+	resp, err := c.Delete(Context(), apiPath, nil, tokenType, opts...)
+	if err != nil {
+		return "", fmt.Errorf("删除知识空间失败: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("删除知识空间失败: HTTP %d, body: %s", resp.StatusCode, string(resp.RawBody))
+	}
+	var parsed struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		Data struct {
+			TaskID string `json:"task_id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp.RawBody, &parsed); err != nil {
+		return "", fmt.Errorf("删除知识空间响应解析失败: %w", err)
+	}
+	if parsed.Code != 0 {
+		return "", fmt.Errorf("删除知识空间失败: code=%d, msg=%s", parsed.Code, parsed.Msg)
+	}
+	return parsed.Data.TaskID, nil
+}
+
+// GetWikiDeleteSpaceTask 查询 delete_space 异步任务的当前状态。
+func GetWikiDeleteSpaceTask(taskID, userAccessToken string) (*WikiDeleteSpaceTaskStatus, error) {
+	c, err := GetClient()
+	if err != nil {
+		return nil, err
+	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
+	apiPath := fmt.Sprintf("/open-apis/wiki/v2/tasks/%s?task_type=delete_space", taskID)
+	resp, err := c.Get(Context(), apiPath, nil, tokenType, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("查询 delete_space 任务失败: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("查询 delete_space 任务失败: HTTP %d, body: %s", resp.StatusCode, string(resp.RawBody))
+	}
+	var parsed struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		Data struct {
+			Task struct {
+				TaskID            string `json:"task_id"`
+				DeleteSpaceResult struct {
+					Status    string `json:"status"`
+					StatusMsg string `json:"status_msg"`
+				} `json:"delete_space_result"`
+			} `json:"task"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp.RawBody, &parsed); err != nil {
+		return nil, fmt.Errorf("查询 delete_space 任务响应解析失败: %w", err)
+	}
+	if parsed.Code != 0 {
+		return nil, fmt.Errorf("查询 delete_space 任务失败: code=%d, msg=%s", parsed.Code, parsed.Msg)
+	}
+	return &WikiDeleteSpaceTaskStatus{
+		TaskID:    parsed.Data.Task.TaskID,
+		Status:    parsed.Data.Task.DeleteSpaceResult.Status,
+		StatusMsg: parsed.Data.Task.DeleteSpaceResult.StatusMsg,
+	}, nil
 }

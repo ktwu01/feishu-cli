@@ -291,3 +291,116 @@ func SearchDocWiki(opts SearchDocWikiOptions, userAccessToken string) (*SearchDo
 
 	return result, nil
 }
+
+// DriveSearchOptions 是 search/v2/doc_wiki/search v2 端点的扁平 filter 选项。
+// 与 v1 端点（/suite/docs-api/search/object）共存：v2 提供更丰富的过滤维度
+// （folder-tokens、space-ids、creator-ids、only-title、time windows）。
+type DriveSearchOptions struct {
+	Query        string   // 关键字（可空，纯按 filter 浏览）
+	PageToken    string   // 分页 token
+	PageSize     int      // 1-20，默认 15
+	CreatorIDs   []string // 创建者 open_id 列表
+	FolderTokens []string // 文件夹 token 列表（限定云盘内）
+	SpaceIDs     []string // 知识库 space_id 列表（限定 wiki 内）
+	ChatIDs      []string // 聊天 id 列表
+	SharerIDs    []string // 分享者 open_id 列表
+	DocTypes     []string // doc/sheet/bitable/mindnote/file/wiki/docx/folder/catalog/slides/shortcut（大写）
+	OnlyTitle    bool     // 仅匹配标题
+	OnlyComment  bool     // 仅搜评论
+	Sort         string   // default / edit_time / edit_time_asc / open_time / create_time
+}
+
+// DriveSearchResult 是 v2 search 的精简结果视图。
+type DriveSearchResult struct {
+	Total     int                      `json:"total"`
+	HasMore   bool                     `json:"has_more"`
+	PageToken string                   `json:"page_token,omitempty"`
+	Items     []map[string]interface{} `json:"items"`
+}
+
+// DriveSearchV2 调用 /open-apis/search/v2/doc_wiki/search。
+// 需要 User Access Token + scope search:docs:read。
+func DriveSearchV2(opts DriveSearchOptions, userAccessToken string) (*DriveSearchResult, error) {
+	c, err := GetClient()
+	if err != nil {
+		return nil, err
+	}
+
+	body := map[string]interface{}{}
+	if opts.Query != "" {
+		body["query"] = opts.Query
+	}
+	if opts.PageToken != "" {
+		body["page_token"] = opts.PageToken
+	}
+	pageSize := opts.PageSize
+	if pageSize <= 0 {
+		pageSize = 15
+	}
+	body["page_size"] = pageSize
+
+	// 嵌套 filter 对象（按 v2 协议）
+	filter := map[string]interface{}{}
+	if len(opts.CreatorIDs) > 0 {
+		filter["creator_ids"] = opts.CreatorIDs
+	}
+	if len(opts.FolderTokens) > 0 {
+		filter["folder_tokens"] = opts.FolderTokens
+	}
+	if len(opts.SpaceIDs) > 0 {
+		filter["space_ids"] = opts.SpaceIDs
+	}
+	if len(opts.ChatIDs) > 0 {
+		filter["chat_ids"] = opts.ChatIDs
+	}
+	if len(opts.SharerIDs) > 0 {
+		filter["sharer_ids"] = opts.SharerIDs
+	}
+	if len(opts.DocTypes) > 0 {
+		filter["doc_types"] = opts.DocTypes
+	}
+	if opts.OnlyTitle {
+		filter["only_title"] = true
+	}
+	if opts.OnlyComment {
+		filter["only_comment"] = true
+	}
+	if len(filter) > 0 {
+		body["filter"] = filter
+	}
+	if opts.Sort != "" {
+		body["sort"] = opts.Sort
+	}
+
+	resp, err := c.Post(Context(), "/open-apis/search/v2/doc_wiki/search", body,
+		larkcore.AccessTokenTypeUser, UserTokenOption(userAccessToken)...)
+	if err != nil {
+		return nil, fmt.Errorf("drive 搜索失败: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("drive 搜索失败: HTTP %d, body: %s", resp.StatusCode, string(resp.RawBody))
+	}
+
+	var parsed struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		Data struct {
+			Total     int                      `json:"total"`
+			HasMore   bool                     `json:"has_more"`
+			PageToken string                   `json:"page_token"`
+			ResUnits  []map[string]interface{} `json:"res_units"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp.RawBody, &parsed); err != nil {
+		return nil, fmt.Errorf("drive 搜索响应解析失败: %w", err)
+	}
+	if parsed.Code != 0 {
+		return nil, fmt.Errorf("drive 搜索失败: code=%d, msg=%s", parsed.Code, parsed.Msg)
+	}
+	return &DriveSearchResult{
+		Total:     parsed.Data.Total,
+		HasMore:   parsed.Data.HasMore,
+		PageToken: parsed.Data.PageToken,
+		Items:     parsed.Data.ResUnits,
+	}, nil
+}

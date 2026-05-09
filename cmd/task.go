@@ -10,14 +10,15 @@ var taskCmd = &cobra.Command{
 	Long: `任务操作命令，用于创建、查看、更新和管理飞书任务。
 
 子命令:
-  create    创建新任务
-  get       获取任务详情
-  list      列出任务
-  my        查看我的任务（需要 User Access Token）
-  update    更新任务
-  delete    删除任务
-  complete  完成任务
-  reopen    重新打开已完成的任务
+  create             创建新任务
+  get                获取任务详情
+  list               列出任务
+  my                 查看我的任务（需要 User Access Token）
+  update             更新任务
+  delete             删除任务
+  complete           完成任务
+  reopen             重新打开已完成的任务
+  upload-attachment  把本地文件作为附件挂到任务下（≤ 50MB）
 
 示例:
   # 创建任务

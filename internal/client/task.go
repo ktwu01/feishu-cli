@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -1040,6 +1041,86 @@ func RemoveTasklistMembers(tasklistGuid string, memberIDs []string, memberRole s
 	}
 
 	return tasklistToInfo(resp.Data.Tasklist), nil
+}
+
+// TaskAttachmentInfo 任务附件信息
+type TaskAttachmentInfo struct {
+	Guid         string `json:"guid"`
+	Name         string `json:"name"`
+	Size         int    `json:"size,omitempty"`
+	URL          string `json:"url,omitempty"`
+	ResourceType string `json:"resource_type,omitempty"`
+	UploadedAt   string `json:"uploaded_at,omitempty"`
+}
+
+// taskAttachmentMaxSize 单文件 50 MB 上限（飞书 task v2 文档明确）
+const taskAttachmentMaxSize = 50 << 20
+
+// UploadTaskAttachment 给指定 task_guid（或其他 resource_type）上传一个本地文件作为附件。
+// 走 SDK 原生 Attachment.Upload，避免手写 multipart。
+func UploadTaskAttachment(resourceType, resourceID, filePath, userAccessToken string) (*TaskAttachmentInfo, error) {
+	if resourceType == "" {
+		resourceType = "task"
+	}
+	if resourceID == "" {
+		return nil, fmt.Errorf("resource_id 不能为空")
+	}
+
+	c, err := GetClient()
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("打开附件失败: %w", err)
+	}
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("获取附件信息失败: %w", err)
+	}
+	if stat.IsDir() {
+		return nil, fmt.Errorf("附件路径必须是文件，不是目录: %s", filePath)
+	}
+	if stat.Size() > taskAttachmentMaxSize {
+		return nil, fmt.Errorf("附件大小 %s 超过 50MB 限制", formatSize(int(stat.Size())))
+	}
+
+	input := larktask.NewInputAttachmentBuilder().
+		ResourceType(resourceType).
+		ResourceId(resourceID).
+		File(f).
+		Build()
+
+	req := larktask.NewUploadAttachmentReqBuilder().
+		UserIdType("open_id").
+		InputAttachment(input).
+		Build()
+
+	resp, err := c.Task.V2.Attachment.Upload(Context(), req, UserTokenOption(userAccessToken)...)
+	if err != nil {
+		return nil, fmt.Errorf("上传任务附件失败: %w", err)
+	}
+	if !resp.Success() {
+		return nil, fmt.Errorf("上传任务附件失败: %s (code: %d)", resp.Msg, resp.Code)
+	}
+	if resp.Data == nil || len(resp.Data.Items) == 0 {
+		return nil, fmt.Errorf("上传任务附件成功但未返回 attachment 信息")
+	}
+	att := resp.Data.Items[0]
+	info := &TaskAttachmentInfo{
+		Guid:       StringVal(att.Guid),
+		Name:       StringVal(att.Name),
+		Size:       IntVal(att.Size),
+		URL:        StringVal(att.Url),
+		UploadedAt: StringVal(att.UploadedAt),
+	}
+	if att.Resource != nil {
+		info.ResourceType = StringVal(att.Resource.Type)
+	}
+	return info, nil
 }
 
 // taskToInfo converts SDK Task to TaskInfo

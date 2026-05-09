@@ -20,6 +20,8 @@ var driveCmd = &cobra.Command{
   - drive move      folder 移动时轮询 task_check
   - drive add-comment 支持局部评论、wiki URL 解析、富文本 reply_elements
   - drive task-result 通用异步任务查询（import/export/task_check）
+  - drive pull/push/status 云盘 ↔ 本地单向镜像（SHA-256 diff + 安全 --delete-* --yes 双确认）
+  - drive search    v2 doc_wiki/search 扁平 filter，支持 folder-tokens / space-ids / creator-ids / time windows
 
 所有子命令默认走 User Access Token，先 feishu-cli auth login。
 
@@ -32,11 +34,18 @@ var driveCmd = &cobra.Command{
   move            移动文件/文件夹
   add-comment     添加文件评论（支持局部、wiki 解析、富文本）
   task-result     通用异步任务查询
+  pull            把云盘文件夹镜像到本地（Drive → 本地）
+  push            把本地目录镜像到云盘文件夹（本地 → Drive）
+  status          本地 ↔ 云盘 SHA-256 内容对照（不修改）
+  search          v2 端点搜索文档 / 知识库（扁平 filter）
 
 示例:
   feishu-cli drive upload --file big.zip --folder-token fldxxx
   feishu-cli drive export --token docxxx --doc-type docx --file-extension markdown --output-dir ./exports
-  feishu-cli drive add-comment --doc https://xxx.feishu.cn/docx/yyy --content '[{"type":"text","text":"评论内容"}]'`,
+  feishu-cli drive add-comment --doc https://xxx.feishu.cn/docx/yyy --content '[{"type":"text","text":"评论内容"}]'
+  feishu-cli drive status --folder-token fldxxx --local-dir ./mirror
+  feishu-cli drive pull --folder-token fldxxx --local-dir ./mirror --if-exists overwrite
+  feishu-cli drive push --folder-token fldxxx --local-dir ./mirror --delete-remote --yes`,
 }
 
 func init() {

@@ -1,6 +1,8 @@
 package client
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -367,6 +369,97 @@ func ListFiles(folderToken string, pageSize int, pageToken string, userAccessTok
 	}
 
 	return files, nextPageToken, hasMore, nil
+}
+
+// DriveRemoteEntry 是 ListFolderRecursive 返回的单个云盘条目。
+// 与 DriveFile 相比，附带递归基础上的 RelPath（用 "/" 分隔）。
+type DriveRemoteEntry struct {
+	FileToken string
+	Type      string // file / folder / docx / sheet / bitable / mindnote / slides / shortcut
+	RelPath   string
+}
+
+// ListFolderRecursive 递归列出 folderToken 下的所有条目（每个 type 都收，包括 folder/docx/...）。
+// 返回 map 的 key 是相对 listing 根的路径，分隔符固定为 "/"。
+// 调用方按 Type 过滤需要的子集（pull/status 只看 type=file，push 把 file 上传、folder 用作 cache）。
+func ListFolderRecursive(folderToken, userAccessToken string) (map[string]DriveRemoteEntry, error) {
+	out := make(map[string]DriveRemoteEntry)
+	if err := listFolderRecursiveInner(folderToken, "", userAccessToken, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func listFolderRecursiveInner(folderToken, relBase, userAccessToken string, out map[string]DriveRemoteEntry) error {
+	pageToken := ""
+	for {
+		files, nextPageToken, hasMore, err := ListFiles(folderToken, 200, pageToken, userAccessToken)
+		if err != nil {
+			return err
+		}
+		for _, f := range files {
+			if f.Name == "" || f.Token == "" {
+				continue
+			}
+			rel := f.Name
+			if relBase != "" {
+				rel = relBase + "/" + f.Name
+			}
+			out[rel] = DriveRemoteEntry{FileToken: f.Token, Type: f.Type, RelPath: rel}
+			if f.Type == "folder" {
+				if err := listFolderRecursiveInner(f.Token, rel, userAccessToken, out); err != nil {
+					return err
+				}
+			}
+		}
+		if !hasMore || nextPageToken == "" {
+			break
+		}
+		pageToken = nextPageToken
+	}
+	return nil
+}
+
+// HashRemoteFile 下载远端文件并计算 SHA-256。仅用于 status 比对，不落地到磁盘。
+func HashRemoteFile(fileToken, userAccessToken string) (string, error) {
+	c, err := GetClient()
+	if err != nil {
+		return "", err
+	}
+	tokenType, opts := resolveTokenOpts(userAccessToken)
+	apiPath := fmt.Sprintf("/open-apis/drive/v1/files/%s/download", fileToken)
+	resp, err := c.Get(Context(), apiPath, nil, tokenType, opts...)
+	if err != nil {
+		return "", fmt.Errorf("下载远端文件以计算哈希失败 (token=%s): %w", fileToken, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("下载远端文件以计算哈希失败 (token=%s): HTTP %d", fileToken, resp.StatusCode)
+	}
+	h := sha256.New()
+	h.Write(resp.RawBody)
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// HashLocalFile 计算本地文件的 SHA-256。
+func HashLocalFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// DeleteDriveFileByToken 删除 type=file 的云盘文件（type=folder 不在本镜像范围内删除）。
+func DeleteDriveFileByToken(fileToken, userAccessToken string) error {
+	if _, err := DeleteFile(fileToken, "file", userAccessToken); err != nil {
+		return fmt.Errorf("删除云盘文件失败 (token=%s): %w", fileToken, err)
+	}
+	return nil
 }
 
 // CreateFolder 创建文件夹

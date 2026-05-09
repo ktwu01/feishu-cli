@@ -10,14 +10,15 @@ var wikiCmd = &cobra.Command{
 	Long: `知识库操作命令，包括创建、更新、删除、移动节点，获取节点信息、列出空间和节点、导出文档等。
 
 子命令:
-  create    创建知识库节点
-  update    更新知识库节点标题
-  delete    删除知识库节点
-  move      移动知识库节点
-  get       获取知识库节点信息
-  spaces    列出知识空间
-  nodes     列出空间下的节点
-  export    导出知识库文档为 Markdown
+  create        创建知识库节点
+  update        更新知识库节点标题
+  delete        删除知识库节点
+  delete-space  删除整个知识空间（异步任务自动轮询）
+  move          移动知识库节点
+  get           获取知识库节点信息
+  spaces        列出知识空间
+  nodes         列出空间下的节点
+  export        导出知识库文档为 Markdown
 
 知识库 URL 格式:
   https://xxx.feishu.cn/wiki/<node_token>

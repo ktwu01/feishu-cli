@@ -311,6 +311,7 @@ feishu-cli wiki export <node_token> -o doc.md       # 导出为 Markdown
 feishu-cli wiki create --space-id <id> --title "新节点"
 feishu-cli wiki move-docs <obj_token> --space-id <id>  # 移动云空间文档至知识空间
 feishu-cli wiki space-get <space_id>                # 获取知识空间详情
+feishu-cli wiki delete-space <space_id> --yes       # 删除整个知识空间（异步任务自动轮询）
 
 # 知识空间成员管理
 feishu-cli wiki member add <space_id> --member-type userid --member-id USER_ID --role admin
@@ -631,6 +632,7 @@ feishu-cli task subtask create <task_guid> --summary "子任务"
 feishu-cli task subtask list <task_guid>
 feishu-cli task member add <task_guid> --members id1,id2 --role assignee
 feishu-cli task reminder add <task_guid> --minutes 30
+feishu-cli task upload-attachment --task-guid <task_guid> --file ./report.pdf
 
 # 任务列表
 feishu-cli tasklist create --name "任务列表"
@@ -662,6 +664,7 @@ feishu-cli bitable field create --base-token bscnxxxx --table-id tblxxx --config
 feishu-cli bitable record upsert --base-token bscnxxxx --table-id tblxxx --config '{"fields":{"名称":"测试"}}'
 feishu-cli bitable record upsert --base-token bscnxxxx --table-id tblxxx --record-id recxxx --config '{"fields":{"状态":"完成"}}'
 feishu-cli bitable record batch-create --base-token bscnxxxx --table-id tblxxx --config '{"fields":["fld1"],"rows":[["val1"],["val2"]]}'
+feishu-cli bitable record batch-delete --base-token bscnxxxx --table-id tblxxx --record-ids rec_1,rec_2,rec_3
 feishu-cli bitable record list --base-token bscnxxxx --table-id tblxxx
 feishu-cli bitable view list --base-token bscnxxxx --table-id tblxxx
 feishu-cli bitable view view-filter-get --base-token bscnxxxx --table-id tblxxx --view-id vewxxx
@@ -675,6 +678,16 @@ feishu-cli drive export --token sheetxxxx --doc-type sheet --file-extension csv 
 feishu-cli drive import --file report.docx --type docx --folder-token fldxxx
 feishu-cli drive move --file-token fldxxx --type folder --folder-token fldyyy
 feishu-cli drive add-comment --doc docxxx --content '[{"type":"text","text":"评论"}]'
+
+# 云盘 ↔ 本地单向镜像（pull/push/status）
+feishu-cli drive status --folder-token fldxxx --local-dir ./mirror
+feishu-cli drive pull   --folder-token fldxxx --local-dir ./mirror --if-exists overwrite
+feishu-cli drive push   --folder-token fldxxx --local-dir ./mirror --if-exists skip
+feishu-cli drive pull   --folder-token fldxxx --local-dir ./mirror --delete-local --yes  # 高危：双确认
+
+# 云盘 v2 搜索（扁平 filter；search docs 走 v1，drive search 走 v2）
+feishu-cli drive search --query "季度报告" --doc-types DOC,SHEET --sort edit_time
+feishu-cli drive search --folder-tokens fldxxx --only-title
 
 # 邮箱（mail，需 User Token）
 feishu-cli mail triage --folder INBOX --unread-only --page-size 20

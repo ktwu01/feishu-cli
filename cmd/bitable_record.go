@@ -3,6 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/riba2534/feishu-cli/internal/client"
 	"github.com/spf13/cobra"
@@ -169,6 +171,67 @@ var bitableRecordDeleteCmd = &cobra.Command{
 	},
 }
 
+var bitableRecordBatchDeleteCmd = &cobra.Command{
+	Use:   "batch-delete",
+	Short: "批量删除记录（POST batch_delete，单次最多 500 条）",
+	Long: `批量删除多条记录，对应 base/v3 的 records/batch_delete 接口。
+
+参数（任选其一）:
+  --record-ids   逗号分隔的 record_id 列表
+  --from-file    每行一个 record_id 的文本文件
+
+可选:
+  --table-id     目标数据表（必填）
+  --base-token   多维表格 token（必填）
+
+注意:
+  - 单次最多 500 条；超过会报 400
+  - 与 record delete 单条接口的区别：batch-delete 走 POST batch_delete，对大量删除场景效率更高（少一次握手）`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		tableID, _ := cmd.Flags().GetString("table-id")
+		recordIDsCSV, _ := cmd.Flags().GetString("record-ids")
+		fromFile, _ := cmd.Flags().GetString("from-file")
+
+		ids, err := loadBatchDeleteRecordIDs(recordIDsCSV, fromFile)
+		if err != nil {
+			return err
+		}
+		if len(ids) > 500 {
+			return fmt.Errorf("单次最多 500 条，当前传入 %d 条", len(ids))
+		}
+
+		body := map[string]any{"record_id_list": ids}
+		return runBaseV3WithBody(cmd, "POST", func(baseToken string) string {
+			return bitableRecordPath(baseToken, tableID, "batch_delete")
+		}, body)
+	},
+}
+
+// loadBatchDeleteRecordIDs 解析 --record-ids（逗号分隔）或 --from-file（每行一个）。
+// 至少需要其中一个，且最终 record_id 列表不能为空。
+func loadBatchDeleteRecordIDs(csv, fromFile string) ([]string, error) {
+	var ids []string
+	if csv != "" {
+		ids = append(ids, splitAndTrim(csv)...)
+	}
+	if fromFile != "" {
+		data, err := os.ReadFile(fromFile)
+		if err != nil {
+			return nil, fmt.Errorf("读取 --from-file 失败: %w", err)
+		}
+		for _, raw := range strings.Split(string(data), "\n") {
+			raw = strings.TrimSpace(raw)
+			if raw != "" {
+				ids = append(ids, raw)
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("--record-ids 或 --from-file 至少需要提供一个")
+	}
+	return ids, nil
+}
+
 var bitableRecordHistoryListCmd = &cobra.Command{
 	Use:   "history-list",
 	Short: "记录修改历史",
@@ -211,7 +274,7 @@ func init() {
 	recordSubs := []*cobra.Command{
 		bitableRecordListCmd, bitableRecordGetCmd, bitableRecordSearchCmd,
 		bitableRecordUpsertCmd, bitableRecordBatchCreateCmd, bitableRecordBatchUpdateCmd,
-		bitableRecordDeleteCmd, bitableRecordHistoryListCmd,
+		bitableRecordDeleteCmd, bitableRecordBatchDeleteCmd, bitableRecordHistoryListCmd,
 	}
 	for _, c := range recordSubs {
 		bitableRecordCmd.AddCommand(c)
@@ -231,6 +294,10 @@ func init() {
 
 	// delete 需要 record-id
 	bitableRecordDeleteCmd.Flags().String("record-id", "", "record_id（必填）")
+
+	// batch-delete 通过 --record-ids 或 --from-file 传入
+	bitableRecordBatchDeleteCmd.Flags().String("record-ids", "", "逗号分隔的 record_id 列表")
+	bitableRecordBatchDeleteCmd.Flags().String("from-file", "", "每行一个 record_id 的文件")
 
 	// upsert 可选 record-id（有则 PATCH 更新，无则 POST 创建）
 	bitableRecordUpsertCmd.Flags().String("record-id", "", "record_id（不传则创建新记录）")
