@@ -19,6 +19,7 @@ var wikiCmd = &cobra.Command{
   spaces        列出知识空间
   nodes         列出空间下的节点
   export        导出知识库文档为 Markdown
+  export-tree   递归导出整个知识库子树为本地目录
 
 知识库 URL 格式:
   https://xxx.feishu.cn/wiki/<node_token>
@@ -55,8 +56,11 @@ var wikiCmd = &cobra.Command{
   # 列出空间下的节点
   feishu-cli wiki nodes <space_id>
 
-  # 导出为 Markdown（仅支持 docx 类型）
-  feishu-cli wiki export <node_token> --output doc.md`,
+  # 导出为 Markdown（仅支持 docx / sheet 类型）
+  feishu-cli wiki export <node_token> --output doc.md
+
+  # 递归导出整个子树（按 wiki 目录结构镜像到本地）
+  feishu-cli wiki export-tree <node_token> --output-dir ./backup`,
 }
 
 func init() {
