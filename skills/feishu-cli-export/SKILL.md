@@ -275,6 +275,71 @@ sleep 5 && feishu-cli doc export <doc_id>
 
 ---
 
+## 递归导出整棵知识库子树（wiki export-tree）
+
+`wiki export` 只能导出单个节点。当需要批量备份整个知识库分区或子树时，用 `wiki export-tree`：以指定节点为根，递归遍历整棵子树，按 wiki 目录结构镜像到本地。
+
+### 基本用法
+
+```bash
+# 导出整棵子树到当前目录
+feishu-cli wiki export-tree <node_token>
+
+# 指定输出目录
+feishu-cli wiki export-tree <node_token> -o ./backup
+
+# 通过 URL 导出
+feishu-cli wiki export-tree https://xxx.feishu.cn/wiki/<node_token> -o ./backup
+
+# 限制深度（避免拉超大子树）
+feishu-cli wiki export-tree <token> -o ./backup --max-depth 3
+
+# 增量同步：已存在且非空的 md 跳过
+feishu-cli wiki export-tree <token> -o ./backup --skip-existing
+
+# 同时下载图片到 assets 目录
+feishu-cli wiki export-tree <token> -o ./backup --download-images --assets-dir ./backup/assets
+```
+
+### 输出布局
+
+```
+./<output-dir>/<根节点标题>.md                # 根节点本身
+./<output-dir>/<子目录>/<子目录>.md           # 有子节点的节点：自身放在同名目录里
+./<output-dir>/<子目录>/<叶子节点>.md         # 叶子节点直接放在父目录
+```
+
+### 参数
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `<node_token\|url>` | 根节点 token 或 URL | 必填 |
+| `-o, --output-dir` | 输出根目录 | `./` |
+| `--max-depth` | 最大递归深度（0 = 无限） | `10` |
+| `--include-types` | 要导出的 obj_type（逗号分隔） | `docx,sheet` |
+| `--skip-existing` | 已存在且非空的 md 跳过（增量同步） | `false` |
+| `--continue-on-error` | 单节点失败时是否继续后续节点 | `true` |
+| `--download-images` | 下载图片到本地（透传给底层 export） | `false` |
+| `--assets-dir` | 图片下载目录 | `./assets` |
+| `--user-access-token` | 可选；默认用 `auth login` 登录态，失败回退 App Token | 自动 |
+
+### 节点类型支持
+
+- ✅ `docx`（新版文档，完整支持）
+- ✅ `sheet`（电子表格，读取数据转 Markdown 表格）
+- ❌ `doc` / `bitable` / `mindnote` / `file` / `slides` —— 跳过并计入 `unsupported`
+
+### 与 `wiki export` 的区别
+
+| 场景 | 用 `wiki export` | 用 `wiki export-tree` |
+|------|------------------|----------------------|
+| 单篇文档 | ✅ | 也可（但是杀鸡用牛刀） |
+| 整个知识库分区/子树备份 | ❌ 需手写循环 | ✅ 一键完成 |
+| 增量同步（只更新新增/未导出节点） | ❌ | ✅ `--skip-existing` |
+| 容错（部分节点权限不足时） | 整体失败 | ✅ `--continue-on-error=true`（默认） |
+
+---
+
 ## 异步导出为 PDF/Word/Excel（doc export-file）
 
 将飞书云文档导出为 PDF、Word 等格式（异步三步流程）：

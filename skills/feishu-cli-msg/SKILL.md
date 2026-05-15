@@ -141,9 +141,27 @@ feishu-cli msg send \
   --text "你好，这是一条测试消息"
 ```
 
-text 类型支持的内联语法：
-- `@` 用户：`<at user_id="ou_xxx">Tom</at>`
+text 类型支持的内联 @ 语法：
+- `@` 用户：`<at user_id="ou_xxx">Tom</at>` —— `ou_xxx` 必须是真实 open_id
 - `@` 所有人：`<at user_id="all"></at>`
+- `@` 机器人：与 @ 用户语法相同，把 `ou_xxx` 换成机器人 open_id 即可
+
+**只能用 open_id**：`<at email="...">` 在 text 消息里**不会触发 @ entity**（飞书 IM 客户端会把邮箱字符串自动渲染成超链接，看起来像 @ 但没有通知、不是真的提及）。需要 @ 邮箱用户，先查 open_id：
+
+```bash
+# 第一步：查 open_id
+feishu-cli user search --email alice@example.com -o json
+# 第二步：用真实 open_id @ 人
+feishu-cli msg send --receive-id-type chat_id --receive-id oc_xxx \
+  --text '<at user_id="ou_xxx">Alice</at> 你好'
+```
+
+**容错（仅 `--text` 模式）**：`msg send` / `msg reply` 在 `--text` 模式下会自动修正 AI 易写错的 @ 标签格式，下列写法都会被规范化为标准 `<at user_id="...">`：
+- `<at id=ou_xxx>`（缺引号 / 用 `id` 而非 `user_id`）
+- `<at open_id="ou_xxx"/>`（自闭合 / 用 `open_id`）
+- `<at user_id=ou_xxx/>`（自闭合无引号）
+
+`--content` / `--content-file` 模式**不做隐式 normalize**（用户自己写的 JSON 自己负责，避免破坏结构）。
 
 **注意**：text 类型**不支持**富文本样式（加粗、斜体、下划线、删除线、超链接等均不会渲染）。如需格式排版，请使用 `post` 类型。
 
@@ -646,20 +664,24 @@ feishu-cli msg forward <message_id> \
 
 ```bash
 feishu-cli msg mget --message-ids om_xxx,om_yyy,om_zzz
+# 默认 user_card_content，CLI 自动提取 card_texts 字段方便阅读
 
-# interactive 卡片返回原始 schema 2.0 JSON（开发者视角的 userDSL，便于偷师）
+# 显式拿原始 schema 2.0 userDSL（默认行为，等价于不传）
 feishu-cli msg mget --message-ids om_xxx,om_yyy --card-content-type user
 
 # 返回平台内部完整 cardDSL（含默认补全字段，调试用）
 feishu-cli msg mget --message-ids om_xxx,om_yyy --card-content-type raw
+
+# 回到 OAPI 旧的"渲染版/降级版"行为（部分卡片可能只返回"请升级客户端"占位）
+feishu-cli msg mget --message-ids om_xxx,om_yyy --card-content-type rendered
 ```
 
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
 | `--message-ids` | 消息 ID 列表（逗号分隔） | 必填 |
-| `--card-content-type` | interactive 卡片返回格式：`user` / `user_card_content`（userDSL）/ `raw` / `raw_card_content`（cardDSL）/ 空（默认渲染版） | 空 |
+| `--card-content-type` | interactive 卡片返回格式：`user` / `user_card_content`（userDSL）/ `raw` / `raw_card_content`（cardDSL）/ `rendered`（OAPI 原渲染版） | `user`（v1.26+） |
 
-> **`--card-content-type` 同样适用于 `msg get` 和 `msg list`**：仅对 interactive 卡片消息生效，其他 msg_type 不受影响。短别名 `user` / `raw` 与完整 OAPI 名 `user_card_content` / `raw_card_content` 等价，CLI 都接受。`user_card_content` = userDSL（开发者构建卡片时的 schema 2.0 JSON）；`raw_card_content` = cardDSL（平台内部完整描述，含默认补全字段）。
+> **v1.26+ 默认改为 `user`**：不传 `--card-content-type` 时 CLI 默认请求 `user_card_content` 并额外提取 `card_texts` 字段，避免某些卡片只返回"请升级客户端"降级内容。需要旧行为请显式传 `--card-content-type rendered`。**`--card-content-type` 同样适用于 `msg get` / `msg list` / `msg history`**：仅对 interactive 卡片消息生效，其他 msg_type 不受影响。短别名 `user` / `raw` 与完整 OAPI 名 `user_card_content` / `raw_card_content` 等价，CLI 都接受。`user_card_content` = userDSL（开发者构建卡片时的 schema 2.0 JSON）；`raw_card_content` = cardDSL（平台内部完整描述，含默认补全字段）。
 
 ## 下载消息资源
 

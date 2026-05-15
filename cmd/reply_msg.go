@@ -65,6 +65,8 @@ var replyMsgCmd = &cobra.Command{
 			msgContent = content
 		} else if text != "" {
 			msgType = "text"
+			// 在 marshal 前规范化 @ 标签，让 json.Marshal 自动转义双引号，避免破坏 JSON。
+			text = client.NormalizeAtMentions(text)
 			msgContent = client.CreateTextMessageContent(text)
 		} else {
 			return fmt.Errorf("必须指定 --content、--content-file 或 --text")

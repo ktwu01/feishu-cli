@@ -401,15 +401,19 @@ feishu-cli chat delete oc_xxx
 
 ```bash
 feishu-cli msg get om_xxx -o json
+# 默认 user_card_content，CLI 自动提取 card_texts 方便阅读
 
-# interactive 卡片拿到原始 schema 2.0 JSON（开发者视角的 userDSL，便于偷师/调试）
+# 显式拿原始 schema 2.0 userDSL（默认行为，等价于不传）
 feishu-cli msg get om_xxx --card-content-type user -o json
 
 # 返回平台内部完整 cardDSL（含默认补全字段）
 feishu-cli msg get om_xxx --card-content-type raw -o json
+
+# 回到 OAPI 旧的"渲染版/降级版"（部分卡片可能只返回"请升级客户端"占位）
+feishu-cli msg get om_xxx --card-content-type rendered -o json
 ```
 
-> **`--card-content-type`** 接受 `user` / `user_card_content`（userDSL）/ `raw` / `raw_card_content`（cardDSL）/ 空（默认渲染版），短别名与完整 OAPI 名等价。同样适用于 `msg list` 和 `msg mget`，仅对 interactive 卡片生效，其他 msg_type 不受影响。`user_card_content` = userDSL（开发者构建卡片时的 schema 2.0 JSON）；`raw_card_content` = cardDSL（平台内部完整描述，含默认补全字段）。
+> **v1.26+ 默认改为 `user`**：不传 `--card-content-type` 时 CLI 默认请求 `user_card_content` 并额外提取 `card_texts` 字段，避免某些卡片只返回"请升级客户端"降级内容。需要旧行为请显式传 `--card-content-type rendered`。**`--card-content-type` 接受** `user` / `user_card_content`（userDSL）/ `raw` / `raw_card_content`（cardDSL）/ `rendered`（OAPI 原渲染版），短别名与完整 OAPI 名等价。**同样适用于 `msg list` / `msg mget` / `msg history`**，仅对 interactive 卡片生效，其他 msg_type 不受影响。`user_card_content` = userDSL（开发者构建卡片时的 schema 2.0 JSON）；`raw_card_content` = cardDSL（平台内部完整描述，含默认补全字段）。
 
 ### 合并转发消息自动展开（v1.23.0+）
 

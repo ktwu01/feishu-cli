@@ -192,6 +192,9 @@ var sendMessageCmd = &cobra.Command{
 
 		case text != "":
 			msgType = "text"
+			// 在 marshal 前规范化 @ 标签（修复 <at id=...> / <at open_id=...> 等 AI 易错格式），
+			// 让 json.Marshal 自动转义产生的双引号，避免破坏 JSON 结构。
+			text = client.NormalizeAtMentions(text)
 			msgContent = client.CreateTextMessageContent(text)
 
 		default:
