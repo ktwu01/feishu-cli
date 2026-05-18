@@ -537,12 +537,19 @@ func CreateApprovalInstance(opts CreateApprovalInstanceOptions, userAccessToken 
 		"approval_code": opts.ApprovalCode,
 		"form":          opts.Form,
 	}
-	switch opts.UserIDType {
+	// v1 PR 二轮 rv 修：空 UserIDType normalize 为 "open_id"（与文档/cmd 层默认一致），
+	// 避免 client 层直接调用且省略 UserIDType 时 ou_xxx 错误下发到 user_id 字段。
+	uidType := strings.TrimSpace(opts.UserIDType)
+	if uidType == "" {
+		uidType = "open_id"
+	}
+	switch uidType {
 	case "open_id":
 		body["open_id"] = opts.UserID
-	default:
-		// user_id / union_id / 空 (默认走 user_id 字段，由 user_id_type query 决定语义)
+	case "user_id", "union_id":
 		body["user_id"] = opts.UserID
+	default:
+		return nil, fmt.Errorf("不支持的 user_id_type: %q（合法值: open_id / user_id / union_id）", opts.UserIDType)
 	}
 	if opts.DepartmentID != "" {
 		body["department_id"] = opts.DepartmentID

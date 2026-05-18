@@ -267,11 +267,15 @@ func checkProxy() checkResult {
 	if httpProxy == "" {
 		return checkPass("proxy", "未设置 HTTP(S)_PROXY")
 	}
-	feishuDomains := []string{".feishu.cn", ".larkoffice.com", ".larksuite.com"}
+	// v1 PR 二轮 rv 加固：按逗号 split 而非 strings.Contains 子串匹配。
+	// Go net/http 的 NO_PROXY 接受多种格式：`feishu.cn` / `.feishu.cn` / `*.feishu.cn` / 带端口；
+	// 我们的"包含飞书域"判定也按这套规则——只要某个 entry 与目标 domain 匹配即视为已覆盖。
+	feishuDomains := []string{"feishu.cn", "larkoffice.com", "larksuite.com"}
+	entries := splitNoProxyEntries(noProxy)
 	var missing []string
 	for _, d := range feishuDomains {
-		if !strings.Contains(noProxy, d) {
-			missing = append(missing, d)
+		if !noProxyCovers(entries, d) {
+			missing = append(missing, "."+d)
 		}
 	}
 	msg := fmt.Sprintf("HTTPS_PROXY=%s", redactProxyURL(httpProxy))
@@ -359,8 +363,10 @@ func outputPretty(results []checkResult) error {
 	return nil
 }
 
-// redactProxyURL 去掉 proxy URL 中的 user:password userinfo，避免 doctor 输出泄露凭证。
-// 入参不是合法 URL 时原样返回（仅尝试 net/url 解析）。
+// redactProxyURL 去掉 proxy URL 中的 userinfo，避免 doctor 输出泄露凭证。
+// 入参不是合法 URL 时原样返回。
+// v1 PR 二轮 rv 加固：username-only（如 token 当 username）也算凭证，统一替换成 ***，
+// 不再依赖 has-password 判定。
 func redactProxyURL(raw string) string {
 	if raw == "" {
 		return raw
@@ -372,9 +378,37 @@ func redactProxyURL(raw string) string {
 	if u.User.Username() == "" {
 		return raw
 	}
-	// 保留 username 提示型存在但 mask password；如果只有 password 也整体替成 ***
-	if _, hasPwd := u.User.Password(); hasPwd {
-		u.User = url.UserPassword(u.User.Username(), "***")
-	}
+	// 任何形态的 userinfo (token-only / user:pass / user-only) 一律 mask 成 ***
+	u.User = url.User("***")
 	return u.String()
+}
+
+// splitNoProxyEntries 把 NO_PROXY 按逗号 split + 去空白，每项去前导点（".feishu.cn" → "feishu.cn"）。
+func splitNoProxyEntries(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		p = strings.TrimPrefix(p, ".")
+		// 去端口（如 "feishu.cn:443" → "feishu.cn"）
+		if i := strings.LastIndex(p, ":"); i > 0 && !strings.Contains(p[i+1:], ".") {
+			p = p[:i]
+		}
+		if p != "" {
+			out = append(out, strings.ToLower(p))
+		}
+	}
+	return out
+}
+
+// noProxyCovers 检查 NO_PROXY entries 是否覆盖目标 domain（subdomain 也算）。
+// 接受精确匹配（"feishu.cn"）以及 suffix 匹配（"a.feishu.cn" 也覆盖 "feishu.cn"）。
+func noProxyCovers(entries []string, domain string) bool {
+	d := strings.ToLower(domain)
+	for _, e := range entries {
+		if e == d || strings.HasSuffix(e, "."+d) {
+			return true
+		}
+	}
+	return false
 }
