@@ -6,6 +6,27 @@
 
 ## 未发布
 
+### 新增 — `sheet filter-view` + `sheet dropdown`：筛选视图与下拉菜单
+
+补齐 lark-cli 独占的两块电子表格高级能力：
+
+- **筛选视图 CRUD（V3 API）**：用 SDK `SpreadsheetSheetFilterView` 实现
+  - `feishu-cli sheet filter-view create --token <t> --sheet-id <s> --range "<sheetId>!A1:H14" [--name 视图名 --filter-view-id 自定义ID]`
+  - `feishu-cli sheet filter-view list --token <t> --sheet-id <s>`
+  - `feishu-cli sheet filter-view delete --token <t> --sheet-id <s> --filter-view-id <fv>`
+  - `--range` 不带 sheetId 前缀时自动补全为 `<sheet-id>!<range>`
+- **下拉菜单（V2 dataValidation API）**：list 类型数据验证
+  - `feishu-cli sheet dropdown set --token <t> --range "<sheetId>!A1:A100" --options "待办,处理中,已完成" [--multiple --colors "#FF4D4F,#FAAD14,#52C41A"]`
+  - `--options-json '["a, b","c"]'`：选项内含逗号时绕过 CSV 解析
+  - 传 `--colors` 自动开启 `highlightValidData`，颜色数量需与选项一致
+
+**权限**：`sheets:spreadsheet`（User Token 或 App Token 均可），命令默认 `resolveOptionalUserTokenWithFallback` 自动读取登录态。
+
+**代码影响范围**：
+
+- `internal/client/sheets.go`：新增 `CreateFilterView` / `ListFilterViews` / `DeleteFilterView` / `SetDropdown`
+- `cmd/sheet_filter_view.go`、`cmd/sheet_dropdown.go`：CLI 入口
+
 ### 新增 — `comment reply add`：为已有评论添加回复
 
 新增命令 `feishu-cli comment reply add <file_token> <comment_id> --text "..."`，补齐评论回复
