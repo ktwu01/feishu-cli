@@ -6,6 +6,44 @@
 
 ## 未发布
 
+### 新增 — `attendance` 考勤查询模块
+
+新增 `attendance` 顶层命令组（别名 `att`），覆盖飞书考勤 OpenAPI 两类查询：
+
+- `feishu-cli attendance user-task query` —— 按日期范围查询用户上下班打卡记录
+  （`POST /open-apis/attendance/v1/user_tasks/query`，单次最多 50 用户）
+- `feishu-cli attendance user-stats query` —— 查询日度 / 月度考勤统计
+  （`POST /open-apis/attendance/v1/user_stats_datas/query`，单次最多 200 用户，
+  起止跨度 ≤ 31 天）
+
+**特性**：
+
+- 日期参数同时接受 `YYYY-MM-DD` 与 `YYYYMMDD`，自动转换为 API 所需的 `yyyyMMdd` 整数
+- 输出双模：默认 `text` 人类可读（打卡时间 / 结果 / 加班标记 / 统计字段标题），
+  `-o json` 直出归一化结构体，便于 AI Agent 与脚本消费
+- 同时打印 `invalid_user_ids` / `unauthorized_user_ids`，提示无效或无权限用户
+- user-task ≤ 50、user-stats ≤ 200 用户数本地预校验，避免无谓远程请求
+- 全部命令强制 User Token（`requireUserToken`），与 mail / vc 等模块行为一致
+
+**权限要求**：`attendance:task:readonly`（User Token）。新增 `auth login --domain
+attendance --recommend` 一键申请。
+
+**使用示例**：
+
+```bash
+# 查询本人最近一周打卡
+feishu-cli attendance user-task query \
+    --employee-type open_id \
+    --user-ids ou_xxxxxxxxx \
+    --start 2026-05-01 --end 2026-05-18
+
+# 查询本月日度统计（JSON 输出）
+feishu-cli attendance user-stats query \
+    --employee-type open_id \
+    --user-ids ou_xxxxxxxxx --current-user-id ou_xxxxxxxxx \
+    --stats-type daily --start 2026-05-01 --end 2026-05-31 -o json
+```
+
 ### 新增 — `comment reply add`：为已有评论添加回复
 
 新增命令 `feishu-cli comment reply add <file_token> <comment_id> --text "..."`，补齐评论回复
