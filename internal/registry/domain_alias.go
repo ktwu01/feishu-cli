@@ -145,6 +145,11 @@ var extraDomainScopes = map[string][]string{
 		"approval:task",
 	},
 
+	// attendance shortcuts: user-task query / user-stats query (read-only)
+	"attendance": {
+		"attendance:task:readonly",
+	},
+
 	// doc shortcuts: +search, +create, +fetch, +update, +media-insert, +media-preview, +media-download
 	"docs": {
 		"search:docs:read",
