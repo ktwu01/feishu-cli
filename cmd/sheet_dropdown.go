@@ -47,6 +47,10 @@ options 用逗号分隔多个选项，每项 ≤ 100 字符；如需选项内出
 			return fmt.Errorf("--token、--range 均为必填项")
 		}
 
+		if strings.TrimSpace(optionsJSON) != "" && strings.TrimSpace(optionsCSV) != "" {
+			return fmt.Errorf("--options 和 --options-json 不能同时使用，请选其一")
+		}
+
 		rangeStr = unescapeSheetRange(rangeStr)
 
 		options, err := parseDropdownOptions(optionsCSV, optionsJSON)

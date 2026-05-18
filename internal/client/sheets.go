@@ -2328,7 +2328,7 @@ func DeleteFilterView(ctx context.Context, spreadsheetToken, sheetID, filterView
 
 // SetDropdown 在指定区域设置下拉菜单（list 类型数据验证）。
 // rangeStr 必须是带 sheetId 前缀的全范围格式 "<sheetId>!A1:A100"。
-// options 是下拉选项（≤ 500 项，每项 ≤ 100 字符，不含逗号）。
+// options 是下拉选项（≤ 500 项，每项 ≤ 100 字符；通过 CSV 传入时不含逗号，含逗号请用 --options-json）。
 // multiple 为 true 时启用多选；colors 长度需与 options 一致（为 nil 时不上色）。
 func SetDropdown(ctx context.Context, spreadsheetToken, rangeStr string, options []string, multiple bool, colors []string, userAccessToken ...string) error {
 	client, err := GetClient()
@@ -2337,7 +2337,7 @@ func SetDropdown(ctx context.Context, spreadsheetToken, rangeStr string, options
 	}
 
 	if !strings.Contains(rangeStr, "!") {
-		return fmt.Errorf("--range 必须包含 sheetId 前缀（例如 0b**12!A1:A100）")
+		return fmt.Errorf("--range 必须包含 sheetId 前缀（例如 <sheetId>!A1:A100）")
 	}
 	if len(options) == 0 {
 		return fmt.Errorf("下拉选项不能为空")
