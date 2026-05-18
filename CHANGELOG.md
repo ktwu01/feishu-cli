@@ -6,6 +6,42 @@
 
 ## 未发布
 
+### 新增 — `msg flag`：消息书签（收藏 / 列表 / 取消）
+
+新增 `feishu-cli msg flag {create,list,cancel}` 三个子命令，对应飞书 OpenAPI `/im/v1/flags`，
+覆盖消息书签的完整生命周期。
+
+**支持的两层书签模型**：
+
+| item_type  | flag_type | 场景                                |
+| ---------- | --------- | ----------------------------------- |
+| default    | message   | 消息层书签（最常见，默认值）        |
+| thread     | feed      | topic-style 话题群 feed 层（侧边栏）|
+| msg_thread | feed      | 普通群消息线程 feed 层              |
+
+其余组合服务端会拒绝，CLI 默认值为 `default + message` 即可覆盖 90% 用例。
+
+**实现说明**：飞书 Open SDK v3 当前未封装 flag 接口，使用通用 HTTP client（`client.Post` /
+`client.Get`）直接调用，与 `comment reply add` 同套路。
+
+**权限要求**：User Token，scope `im:flag`
+
+**使用示例**：
+
+```bash
+# 收藏消息（消息层）
+feishu-cli msg flag create om_xxx
+
+# 列出当前用户所有书签
+feishu-cli msg flag list --page-size 50
+
+# 取消书签（参数需与 create 一致）
+feishu-cli msg flag cancel om_xxx
+
+# feed 层书签（普通群线程）
+feishu-cli msg flag create om_xxx --item-type msg_thread --flag-type feed
+```
+
 ### 新增 — `comment reply add`：为已有评论添加回复
 
 新增命令 `feishu-cli comment reply add <file_token> <comment_id> --text "..."`，补齐评论回复
