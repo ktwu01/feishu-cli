@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -245,6 +246,58 @@ func GetMediaTempURL(fileToken string, opts ...DownloadMediaOptions) (string, er
 	}
 
 	return *resp.Data.TmpDownloadUrls[0].TmpDownloadUrl, nil
+}
+
+// GetMediaSize 返回素材文件的字节大小，且不下载文件内容。
+//
+// 飞书 Drive 的 list 接口不返回文件大小，付费版网页端才暴露按大小排序。
+// 这里用合法的只读方式还原该能力：先取临时下载链接，再对其发 HTTP HEAD，
+// 读取 Content-Length。若服务端不支持 HEAD，则回退到 1 字节 Range GET，
+// 从 Content-Range 末尾解析总大小。全程不落地文件内容。
+//
+// 仅对 type=file 的上传素材有效；docx/sheet/bitable 等无字节大小，返回 (0, nil)。
+func GetMediaSize(fileToken string, opts ...DownloadMediaOptions) (int64, error) {
+	tmpURL, err := GetMediaTempURL(fileToken, opts...)
+	if err != nil {
+		return 0, err
+	}
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+
+	// 优先 HEAD：不传输 body。
+	if req, e := http.NewRequest(http.MethodHead, tmpURL, nil); e == nil {
+		if resp, e2 := httpClient.Do(req); e2 == nil {
+			defer resp.Body.Close()
+			if resp.ContentLength > 0 {
+				return resp.ContentLength, nil
+			}
+		}
+	}
+
+	// 回退：1 字节 Range GET，从 Content-Range "bytes 0-0/<total>" 解析总大小。
+	req, err := http.NewRequest(http.MethodGet, tmpURL, nil)
+	if err != nil {
+		return 0, fmt.Errorf("构造 Range 请求失败: %w", err)
+	}
+	req.Header.Set("Range", "bytes=0-0")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("读取文件大小失败: %w", err)
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, io.LimitReader(resp.Body, 1))
+
+	if cr := resp.Header.Get("Content-Range"); cr != "" {
+		if idx := strings.LastIndex(cr, "/"); idx >= 0 {
+			if total, e := strconv.ParseInt(strings.TrimSpace(cr[idx+1:]), 10, 64); e == nil {
+				return total, nil
+			}
+		}
+	}
+	if resp.ContentLength > 0 {
+		return resp.ContentLength, nil
+	}
+	return 0, fmt.Errorf("无法确定文件大小（服务端未返回 Content-Length/Content-Range）")
 }
 
 // DownloadFromURL downloads a file from a URL with size limit
